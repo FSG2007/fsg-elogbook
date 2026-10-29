@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en-GB"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>FSG Building Services e-logbook</title>
+<link rel="icon" href="fsg-logo.jpg">
+<style>
+:root{--red:#e8432e;--ink:#2f3337;--mut:#6b7178;--line:#e3e5e8;--bg:#f5f6f7;--g:#1f8a4c;--a:#c98a00;--r:#c62f1d;--b:#2d6cdf}
+*{box-sizing:border-box}body{margin:0;font:15px/1.45 -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:4px solid var(--red)}
+.wrap{max-width:1080px;margin:0 auto;padding:16px}
+.top{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.top img{height:54px}.ttl{flex:1;min-width:220px}.ttl h1{margin:0;font-size:20px}.ttl .s{color:var(--mut);font-size:13px}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+button,.btn{font:inherit;font-size:14px;border:1px solid var(--line);background:#fff;color:var(--ink);padding:8px 12px;border-radius:8px;cursor:pointer}
+button.p{background:var(--red);border-color:var(--red);color:#fff}button:disabled{opacity:.5}
+.site{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:16px 0;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.site h2{margin:0;font-size:22px}.site .s{color:var(--mut)}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 0}
+.tab{border-radius:999px;padding:6px 12px}.tab.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px}
+.card h3{margin:0 0 6px;font-size:15px}.card .big{font-size:13px;color:var(--mut)}
+.pill{display:inline-block;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;color:#fff}
+.G{background:var(--g)}.A{background:var(--a)}.R{background:var(--r)}.B{background:var(--b)}.N{background:#9aa0a6}
+.bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:8px}.bar i{display:block;height:100%;background:var(--g)}
+section{margin:22px 0}section>h2{font-size:17px;margin:0 0 10px;padding-left:10px;border-left:4px solid var(--red)}
+table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:14px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}th{background:#fafbfc;font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--mut)}
+tr:last-child td{border-bottom:0}.sec td{background:#f0f1f3;font-weight:600}
+.panel{border-top:4px solid var(--g)}.panel.warn{border-top-color:var(--a)}
+.mut{color:var(--mut)}.sm{font-size:12px}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;padding:16px;z-index:9}
+.modal.on{display:flex}.box{background:#fff;border-radius:14px;max-width:560px;width:100%;padding:18px;max-height:90vh;overflow:auto}
+.box h3{margin-top:0}input{font:inherit;padding:9px 10px;border:1px solid var(--line);border-radius:8px;width:100%}
+.row{display:flex;gap:8px;margin-top:10px}.err{color:var(--r);font-size:13px;min-height:18px;margin-top:6px}
+footer{color:var(--mut);font-size:12px;text-align:center;padding:24px 16px 40px}
+footer a{color:var(--mut)}
+.loading{padding:60px;text-align:center;color:var(--mut)}
+.pdfmode #pdfdoc{width:780px}.pdfmode .wrap{max-width:none;padding:12px}.pdfmode .grid{grid-template-columns:repeat(3,1fr)}.pdfmode .hide-s{display:table-cell}.pdfmode .btns,.pdfmode .tabs,.pdfmode .noprint,#pdfdoc .btns,#pdfdoc .tabs,#pdfdoc .noprint{display:none!important}
+@media(max-width:640px){.hide-s{display:none}th,td{padding:7px 6px}}
+@media print{.btns,.tabs,.noprint{display:none!important}body{background:#fff}}
+</style></head>
+<body>
+<div id="doc">
+<header><div class="wrap top">
+ <img src="fsg-logo.jpg" alt="FSG - Facility Services Group">
+ <div class="ttl"><h1>FSG Building Services e-logbook</h1><div class="s">Live compliance record, updated automatically from FSG's job system</div></div>
+ <div class="btns"><button class="p" id="bPdf">Download PDF</button><button id="bMail">Email report</button><button id="bEng">Engineer access</button></div>
+</div></header>
+<main class="wrap" id="app"><div class="loading">Loading site record…</div></main>
+<footer><div>Facility Services Group Limited  ·  01792 898040  ·  info@fsgfm.co.uk</div>
+<div class="sm" id="gen"></div>
+<div class="noprint" style="margin-top:8px"><a href="#" id="bSites">FSG staff: all sites</a></div></footer>
+</div>
+
+<div class="modal" id="mPin"><div class="box">
+ <h3 id="pinT">Engineer access</h3><p class="mut sm" id="pinD">Enter the FSG engineer PIN to view panel access codes.  Every view is logged.</p>
+ <input id="pinWho" placeholder="Your name" autocomplete="name">
+ <div class="row"><input id="pin" inputmode="numeric" type="password" placeholder="PIN" autocomplete="off"><button class="p" id="pinGo">Open</button></div>
+ <div class="err" id="pinE"></div><div id="pinOut"></div>
+ <div class="row" style="justify-content:flex-end"><button data-close>Close</button></div>
+</div></div>
+<div class="modal" id="mMail"><div class="box">
+ <h3>Email this report</h3><p class="mut sm">A PDF of the current compliance summary will be sent to the address below.</p>
+ <div class="row"><input id="mailTo" type="email" placeholder="name@company.co.uk"><button class="p" id="mailGo">Send</button></div>
+ <div class="err" id="mailE"></div>
+ <div class="row" style="justify-content:flex-end"><button data-close>Close</button></div>
+</div></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script>
+const API="https://chftzzfssiaacvyvvucu.supabase.co/functions/v1/elogbook";
+const qs=new URLSearchParams(location.search);const TOKEN=qs.get("s")||"";
+let D=null,PANEL="all";
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fd=s=>s?new Date(s).toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"}):"–";
+const ft=s=>s?new Date(s).toLocaleString("en-GB",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}):"–";
+const ORDER=["Fire safety","Emergency lighting","Water hygiene","Electrical","Remote monitoring","Security","Access and safety systems","Building fabric","Site services"];
+const DAY=864e5;
+async function load(){
+  if(!TOKEN){$("#app").innerHTML='<div class="loading">This e-logbook link is incomplete.  Please scan the QR code on site again.</div>';return}
+  try{const r=await fetch(API+"?s="+encodeURIComponent(TOKEN));if(!r.ok)throw 0;D=await r.json();
+    // Weekly fire alarm jobs evidenced by a logged test count as done
+    const tj=new Set(D.tests.map(t=>t.job_number).filter(Boolean));
+    D.items.forEach(i=>{if(i.state!=="done"&&tj.has(i.job)){i.state="done";const t=D.tests.find(x=>x.job_number===i.job);i.doneAt=t.test_at;i.by=t.tested_by}});
+    render()}catch(e){$("#app").innerHTML='<div class="loading">The e-logbook could not be loaded.  Please try again or call FSG on 01792 898040.</div>'}
+}
+function tasks(){ // one row per task type
+  const m={};const now=Date.now();
+  for(const i of D.items){const k=i.key;(m[k]=m[k]||{key:k,label:i.label,section:i.section,all:[]}).all.push(i)}
+  return Object.values(m).map(t=>{
+    const done=t.all.filter(i=>i.state==="done").sort((a,b)=>Date.parse(b.doneAt||b.due)-Date.parse(a.doneAt||a.due));
+    const out=t.all.filter(i=>i.state==="outstanding").sort((a,b)=>Date.parse(a.due)-Date.parse(b.due));
+    const nxt=t.all.filter(i=>i.state==="scheduled").sort((a,b)=>Date.parse(a.due)-Date.parse(b.due));
+    const pastDue=t.all.filter(i=>Date.parse(i.due)<=now&&Date.parse(i.due)>now-365*DAY);const pct=pastDue.length?Math.round(100*pastDue.filter(i=>i.state==="done").length/pastDue.length):100;
+    let st="G",txt="Up to date";
+    if(out.length){const age=(now-Date.parse(out[0].due))/DAY;st=age>14?"R":"A";txt=out.length+" overdue"}
+    else if(!done.length){st="B";txt="Scheduled"}
+    done.forEach(i=>{i.doneAt=i.doneAt||i.due});
+    return {...t,last:done[0],next:nxt[0],out,st,txt,pct}
+  }).sort((a,b)=>ORDER.indexOf(a.section)-ORDER.indexOf(b.section)||a.label.localeCompare(b.label))
+}
+function docsList(){return [...D.docs].filter(d=>/certificate|report|inspection|test|log|survey|analysis/i.test(d.name)&&!/docket|job card|callslip|invoice|quote|purchase/i.test(d.name)).sort((a,b)=>Date.parse(b.date)-Date.parse(a.date))}
+function render(){
+  const s=D.site,T=tasks();
+  const panels=(s.panels||[]).map(p=>p.name);
+  let h=`<div class="site"><div><h2>${esc(s.name)}</h2><div class="s">${esc(s.address)}</div><div class="s sm">Client: ${esc(s.client)}</div>
+   <div class="tabs">${["all",...panels].map(p=>`<button class="tab ${PANEL===p?"on":""}" data-p="${esc(p)}">${p==="all"?"Whole site":esc(p)}</button>`).join("")}</div></div>
+   <div class="sm mut" style="text-align:right">Record updated<br><b>${ft(D.refreshed_at)}</b></div></div>`;
+  // Summary by section
+  const secs=ORDER.filter(x=>T.some(t=>t.section===x));
+  h+=`<section><h2>Compliance summary</h2><div class="grid">`+secs.map(x=>{const ts=T.filter(t=>t.section===x);const w=ts.some(t=>t.st==="R")?"R":ts.some(t=>t.st==="A")?"A":"G";
+    const pd=ts.reduce((a,t)=>a+t.pct,0)/ts.length;
+    return `<div class="card"><h3>${esc(x)}</h3><span class="pill ${w}">${w==="G"?"Compliant":w==="A"?"Attention":"Overdue"}</span> <span class="big">${ts.length} task${ts.length>1?"s":""}</span><div class="bar"><i style="width:${pd}%;background:${w==="G"?"var(--g)":w==="A"?"var(--a)":"var(--r)"}"></i></div><div class="sm mut" style="margin-top:4px">${Math.round(pd)}% of due visits completed (12 months)</div></div>`}).join("")+`</div></section>`;
+  // Fire alarm panels
+  const showP=PANEL==="all"?s.panels:s.panels.filter(p=>p.name===PANEL);
+  h+=`<section><h2>Fire alarm panels</h2><div class="grid">`+showP.map(p=>{const ts=D.tests.filter(t=>t.panel===p.name);const l=ts[0];const ok=l&&/pass/i.test(l.result)&&(Date.now()-Date.parse(l.test_at))<9*DAY;
+    return `<div class="card panel ${ok?"":"warn"}"><h3>${esc(p.name)}</h3><div class="sm mut">${esc(p.ref||"")}</div>
+     <div style="margin-top:8px"><span class="pill ${ok?"G":"A"}">${l?(ok?"Normal at last test":"Weekly test due"):"No test logged"}</span></div>
+     <div class="sm" style="margin-top:8px">Last weekly test: <b>${l?ft(l.test_at):"–"}</b><br>Call point: ${l?esc(l.cp_location):"–"}<br>Result: ${l?esc(l.result):"–"}  ·  ${l?esc(l.tested_by):""}</div></div>`}).join("")+
+   `<div class="card"><h3>Remote monitoring</h3><div class="sm">${esc(s.monitoring?.type||"")}</div><div class="sm mut" style="margin-top:6px">${esc(s.monitoring?.note||"")}</div>
+     ${(()=>{const t=T.find(x=>x.key==="dualcom");return t?`<div class="sm" style="margin-top:6px">Last service: <b>${fd(t.last?.doneAt)}</b></div>`:""})()}</div></div>
+   <p class="sm mut">Panel status shows the result of the most recent logged weekly test.  It is not a live feed from the panel.</p></section>`;
+  // Register
+  h+=`<section><h2>Planned maintenance register</h2><table><thead><tr><th>Task</th><th>Last completed</th><th class="hide-s">By</th><th>Next due</th><th>Status</th></tr></thead><tbody>`;
+  let cur="";for(const t of T){if(t.section!==cur){cur=t.section;h+=`<tr class="sec"><td colspan="5">${esc(cur)}</td></tr>`}
+    h+=`<tr><td>${esc(t.label)}</td><td>${fd(t.last?.doneAt)}</td><td class="hide-s">${esc(t.last?.by||"–")}</td><td>${t.out.length?`<b style="color:var(--r)">${fd(t.out[0].due)}</b>`:fd(t.next?.due)}</td><td><span class="pill ${t.st}">${t.txt}</span></td></tr>`}
+  h+=`</tbody></table></section>`;
+  // Weekly FA log
+  const tl=D.tests.filter(t=>PANEL==="all"||t.panel===PANEL);
+  h+=`<section><h2>Weekly fire alarm test log${PANEL!=="all"?" – "+esc(PANEL):""}</h2><table><thead><tr><th>Date</th><th>Panel</th><th>Call point tested</th><th>Result</th><th class="hide-s">Tested by</th></tr></thead><tbody>`+
+   (tl.length?tl.slice(0,26).map(t=>`<tr><td>${ft(t.test_at)}</td><td>${esc(t.panel)}</td><td>${esc(t.cp_location||t.cp_ref||"")}</td><td><span class="pill ${/pass/i.test(t.result)?"G":"R"}">${esc(t.result)}</span></td><td class="hide-s">${esc(t.tested_by)}</td></tr>`).join(""):`<tr><td colspan="5" class="mut">No tests logged yet.</td></tr>`)+`</tbody></table></section>`;
+  // Visit log
+  const vl=[...D.visits].sort((a,b)=>Date.parse(b.date)-Date.parse(a.date)).slice(0,40);
+  h+=`<section><h2>Visit log</h2><table><thead><tr><th>Date</th><th>Task</th><th class="hide-s">Engineer</th><th class="hide-s">On site</th></tr></thead><tbody>`+
+   vl.map(v=>{const m=v.end?Math.max(0,Math.round((Date.parse(v.end)-Date.parse(v.date))/6e4)):null;return `<tr><td>${ft(v.date)}</td><td>${esc(v.task)}</td><td class="hide-s">${esc(v.who)}</td><td class="hide-s">${m!=null?m+" min":"–"}</td></tr>`}).join("")+`</tbody></table></section>`;
+  // Certificates
+  const dc=docsList().sort((a,b)=>Date.parse(b.date)-Date.parse(a.date));
+  h+=`<section><h2>Certificates and reports on file</h2><table><thead><tr><th>Date</th><th>Document</th><th class="hide-s">Engineer</th></tr></thead><tbody>`+
+   (dc.length?dc.map(d=>`<tr><td>${fd(d.date)}</td><td>${esc(d.name)}</td><td class="hide-s">${esc(d.by||"")}</td></tr>`).join(""):`<tr><td colspan="3" class="mut">None in the last 12 months.</td></tr>`)+
+   `</tbody></table><p class="sm mut">Copies of certificates are available from FSG on request.</p></section>`;
+  $("#app").innerHTML=h;$("#gen").textContent="Generated "+new Date().toLocaleString("en-GB")+"  ·  "+s.name;
+  document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{PANEL=b.dataset.p;render()});
+}
+let LOGO=null;
+async function logo(){if(LOGO)return LOGO;const r=await fetch("fsg-logo.jpg");const bl=await r.blob();LOGO=await new Promise(res=>{const f=new FileReader();f.onload=()=>res(f.result);f.readAsDataURL(bl)});return LOGO}
+async function makePdf(out){
+  const {jsPDF}=window.jspdf;const doc=new jsPDF({unit:"mm",format:"a4"});const s=D.site,T=tasks();const RED=[232,67,46],INK=[47,51,55],MUT=[107,113,120];
+  const SC={G:[31,138,76],A:[201,138,0],R:[198,47,29],B:[45,108,223]};
+  const lg=await logo();
+  const head=()=>{doc.addImage(lg,"JPEG",14,9,26,13);doc.setFont("helvetica","bold");doc.setFontSize(14);doc.setTextColor(...INK);doc.text("FSG Building Services e-logbook",46,15);
+    doc.setFont("helvetica","normal");doc.setFontSize(9);doc.setTextColor(...MUT);doc.text(s.address,46,20.5);doc.setDrawColor(...RED);doc.setLineWidth(1);doc.line(14,25,196,25)};
+  const opts={margin:{top:30,left:14,right:14,bottom:16},styles:{fontSize:8.5,cellPadding:1.8,textColor:INK,lineColor:[227,229,232],lineWidth:.1},headStyles:{fillColor:[245,246,247],textColor:MUT,fontStyle:"bold",fontSize:7.5}};
+  const h2=(t,y)=>{doc.setFillColor(...RED);doc.rect(14,y-3.6,1.2,4.6,"F");doc.setFont("helvetica","bold");doc.setFontSize(11.5);doc.setTextColor(...INK);doc.text(t,17.5,y);return y+3};
+  const pill=(st)=>({didParseCell:d=>{if(d.section==="body"&&d.column.dataKey==="st"){const c=SC[d.row.raw._st]||MUT;d.cell.styles.textColor=c;d.cell.styles.fontStyle="bold"}}});
+  head();
+  doc.setFont("helvetica","bold");doc.setFontSize(18);doc.setTextColor(...INK);doc.text(s.name,14,37);
+  doc.setFont("helvetica","normal");doc.setFontSize(9.5);doc.setTextColor(...MUT);doc.text(`${s.address}   ·   Client: ${s.client}`,14,43);
+  doc.text(`Record updated ${ft(D.refreshed_at)}   ·   Report generated ${ft(new Date())}`,14,48);
+  let y=h2("Compliance summary",58);
+  const secs=ORDER.filter(x=>T.some(t=>t.section===x));
+  doc.autoTable({...opts,startY:y,head:[["Area","Tasks","Due visits completed (12 months)","Status"]],columns:[{dataKey:"a"},{dataKey:"n"},{dataKey:"p"},{dataKey:"st"}],
+    body:secs.map(x=>{const ts=T.filter(t=>t.section===x);const w=ts.some(t=>t.st==="R")?"R":ts.some(t=>t.st==="A")?"A":"G";return {a:x,n:ts.length,p:Math.round(ts.reduce((a,t)=>a+t.pct,0)/ts.length)+"%",st:w==="G"?"Compliant":w==="A"?"Attention":"Overdue",_st:w}}),...pill()});
+  y=h2("Fire alarm panels",doc.lastAutoTable.finalY+10);
+  doc.autoTable({...opts,startY:y,head:[["Panel","Reference","Last weekly test","Call point","Result"]],body:s.panels.map(p=>{const l=D.tests.find(t=>t.panel===p.name);return [p.name,p.ref||"",l?ft(l.test_at):"–",l?l.cp_location:"–",l?l.result+" ("+l.tested_by+")":"No test logged"]})});
+  doc.setFontSize(8);doc.setTextColor(...MUT);doc.text(`Remote monitoring: ${s.monitoring?.type||"–"}.  Panel status reflects the latest logged test, not a live feed.`,14,doc.lastAutoTable.finalY+5);
+  y=h2("Planned maintenance register",doc.lastAutoTable.finalY+14);
+  const rows=[];let cur="";for(const t of T){if(t.section!==cur){cur=t.section;rows.push({t:{content:cur,colSpan:5,styles:{fillColor:[240,241,243],fontStyle:"bold"}}})}
+    rows.push({t:t.label,l:fd(t.last?.doneAt),b:t.last?.by||"–",n:t.out.length?fd(t.out[0].due):fd(t.next?.due),st:t.txt,_st:t.st})}
+  doc.autoTable({...opts,startY:y,columns:[{header:"Task",dataKey:"t"},{header:"Last completed",dataKey:"l"},{header:"By",dataKey:"b"},{header:"Next due",dataKey:"n"},{header:"Status",dataKey:"st"}],body:rows,...pill()});
+  y=h2("Weekly fire alarm test log",doc.lastAutoTable.finalY+10);
+  doc.autoTable({...opts,startY:y,head:[["Date","Panel","Call point tested","Result","Tested by"]],body:D.tests.slice(0,26).map(t=>[ft(t.test_at),t.panel,t.cp_location||t.cp_ref||"",t.result,t.tested_by])});
+  y=h2("Visit log",doc.lastAutoTable.finalY+10);
+  doc.autoTable({...opts,startY:y,head:[["Date","Task","Engineer","On site"]],body:[...D.visits].sort((a,b)=>Date.parse(b.date)-Date.parse(a.date)).slice(0,40).map(v=>[ft(v.date),v.task,v.who,v.end?Math.max(0,Math.round((Date.parse(v.end)-Date.parse(v.date))/6e4))+" min":"–"])});
+  y=h2("Certificates and reports on file",doc.lastAutoTable.finalY+10);
+  doc.autoTable({...opts,startY:y,head:[["Date","Document","Engineer"]],body:docsList().map(d=>[fd(d.date),d.name,d.by||""])});
+  const n=doc.getNumberOfPages();for(let i=1;i<=n;i++){doc.setPage(i);if(i>1)head();doc.setFontSize(7.5);doc.setTextColor(...MUT);doc.text("Facility Services Group Limited  ·  01792 898040  ·  info@fsgfm.co.uk",14,290);doc.text(`Page ${i} of ${n}`,196,290,{align:"right"})}
+  const fn=`FSG e-logbook - ${s.name} - ${new Date().toISOString().slice(0,10)}.pdf`;
+  if(out==="b64")return doc.output("datauristring").split(",")[1];doc.save(fn);
+}
+const post=(b)=>fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({s:TOKEN,...b})}).then(async r=>({ok:r.ok,j:await r.json().catch(()=>({}))}));
+$("#bPdf").onclick=async e=>{if(!D)return;e.target.disabled=true;e.target.textContent="Preparing…";await makePdf();post({action:"pdf"});e.target.disabled=false;e.target.textContent="Download PDF"};
+$("#bMail").onclick=()=>{if(D){$("#mailE").textContent="";$("#mMail").classList.add("on")}};
+$("#mailGo").onclick=async e=>{const to=$("#mailTo").value.trim();if(!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(to)){$("#mailE").textContent="Enter a valid email address.";return}
+  e.target.disabled=true;$("#mailE").style.color="var(--mut)";$("#mailE").textContent="Preparing PDF…";const pdf=await makePdf("b64");$("#mailE").textContent="Sending…";
+  const r=await post({action:"email",to,pdf});$("#mailE").style.color=r.ok&&r.j.ok?"var(--g)":"var(--r)";$("#mailE").textContent=r.ok&&r.j.ok?"Sent to "+to+".":(r.j.error||"Could not send.");e.target.disabled=false};
+let MODE="codes";
+function openPin(m){MODE=m;$("#pinT").textContent=m==="codes"?"Engineer access":"FSG staff: all sites";$("#pinD").textContent=m==="codes"?"Enter the FSG engineer PIN to view panel access codes.  Every view is logged.":"Enter the FSG engineer PIN to see every site's e-logbook.";
+  $("#pinWho").style.display=m==="codes"?"":"none";$("#pinE").textContent="";$("#pinOut").innerHTML="";$("#pin").value="";$("#mPin").classList.add("on");$("#pin").focus()}
+$("#bEng").onclick=()=>openPin("codes");$("#bSites").onclick=e=>{e.preventDefault();openPin("sites")};
+$("#pinGo").onclick=async()=>{const pin=$("#pin").value.trim();$("#pinE").textContent="";
+  const r=await post(MODE==="codes"?{action:"codes",pin,who:$("#pinWho").value.trim()}:{action:"sites",pin});
+  if(!r.ok){$("#pinE").textContent=r.j.error||"Not available.";return}
+  if(MODE==="codes"){const c=r.j.codes||[];$("#pinOut").innerHTML=c.length?`<table><thead><tr><th>Panel</th><th>Item</th><th>Code</th></tr></thead><tbody>${c.map(x=>`<tr><td>${esc(x.panel)}</td><td>${esc(x.item)}</td><td><b>${esc(x.value)}</b></td></tr>`).join("")}</tbody></table><p class="sm mut">Do not write down or share these codes.  Close this window when finished.</p>`:`<p class="mut">No codes have been recorded for this site yet.  Contact the FSG office.</p>`}
+  else{$("#pinOut").innerHTML=`<table><tbody>${r.j.sites.map(x=>`<tr><td><a href="?s=${encodeURIComponent(x.token)}"><b>${esc(x.name)}</b></a><div class="sm mut">${esc(x.address||"")}</div></td></tr>`).join("")}</tbody></table>`}};
+$("#pin").onkeydown=e=>{if(e.key==="Enter")$("#pinGo").click()};
+document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>{b.closest(".modal").classList.remove("on");$("#pinOut").innerHTML=""});
+load();
+</script></body></html>
