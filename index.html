@@ -81,12 +81,12 @@ footer a{color:var(--mut)}
 <main class="wrap" id="app"><div class="loading">Loading site record…</div></main>
 <footer><div>Facility Services Group Limited  ·  01792 898040  ·  info@fsgfm.co.uk</div>
 <div class="sm" id="gen"></div>
-<div class="noprint" style="margin-top:8px"><a href="#" id="bSites">FSG staff: all sites</a></div></footer>
+<div class="noprint" style="margin-top:8px"><a href="#" id="bSites">FSG office: all sites</a></div></footer>
 </div>
 
 <div class="modal" id="mPin"><div class="box">
- <h3 id="pinT">Engineer access</h3><p class="mut sm" id="pinD">Enter the FSG engineer PIN to view panel access codes.  Every view is logged.</p>
- <input id="pinWho" placeholder="Your name" autocomplete="name">
+ <h3 id="pinT">Engineer access</h3><p class="sm" id="pinD"></p>
+ <select id="pinWho" style="font:inherit;padding:9px 10px;border:1px solid var(--line);border-radius:8px;width:100%;background:#fff"><option value="">Loading names…</option></select>
  <div class="row"><input id="pin" inputmode="numeric" type="password" placeholder="PIN" autocomplete="off"><button class="p" id="pinGo">Open</button></div>
  <div class="err" id="pinE"></div><div id="pinOut"></div>
  <div class="row" style="justify-content:flex-end"><button data-close>Close</button></div>
@@ -248,15 +248,26 @@ $("#bMail").onclick=()=>{if(D){$("#mailE").textContent="";$("#mMail").classList.
 $("#mailGo").onclick=async e=>{const to=$("#mailTo").value.trim();if(!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(to)){$("#mailE").textContent="Enter a valid email address.";return}
   e.target.disabled=true;$("#mailE").style.color="var(--mut)";$("#mailE").textContent="Preparing PDF…";const pdf=await makePdf("b64");$("#mailE").textContent="Sending…";
   const r=await post({action:"email",to,pdf});$("#mailE").style.color=r.ok&&r.j.ok?"var(--g)":"var(--r)";$("#mailE").textContent=r.ok&&r.j.ok?"Sent to "+to+".":(r.j.error||"Could not send.");e.target.disabled=false};
-let MODE="codes";
-function openPin(m){MODE=m;$("#pinT").textContent=m==="codes"?"Engineer access":"FSG staff: all sites";$("#pinD").textContent=m==="codes"?"Enter the FSG engineer PIN to view panel access codes.  Every view is logged.":"Enter the FSG engineer PIN to see every site's e-logbook.";
-  $("#pinWho").style.display=m==="codes"?"":"none";$("#pinE").textContent="";$("#pinOut").innerHTML="";$("#pin").value="";$("#mPin").classList.add("on");$("#pin").focus()}
+let MODE="codes",ENG=null,OFFPIN=null;
+async function loadEng(){if(ENG)return ENG;const r=await post({action:"engineers"});ENG=r.j.engineers||[];return ENG}
+const TSP='Use your <b>FSG Timesheet PIN</b> &ndash; the same PIN you use to log your timesheets.  There is no separate e-logbook PIN.';
+async function openPin(m){MODE=m;$("#pinE").textContent="";$("#pinOut").innerHTML="";$("#pin").value="";$("#mPin").classList.add("on");
+  const sel=$("#pinWho");
+  if(m==="sites"){$("#pinT").textContent="FSG office: all sites";$("#pinD").innerHTML="Enter the <b>FSG office PIN</b> (the office PIN from the FSG Timesheet) to see every site&rsquo;s e-logbook and codes.";sel.style.display="none";$("#pin").focus();return}
+  $("#pinT").textContent="Engineer access";$("#pinD").innerHTML=TSP+'<br><span class="mut">Every view is logged with your name.</span>';sel.style.display="";
+  const e=await loadEng();sel.innerHTML='<option value="">Select your name…</option><option value="office">FSG office (office PIN)</option>'+e.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join("");
+  const last=localStorage.getItem("elog_eng");if(last)sel.value=last;sel.focus()}
 $("#bEng").onclick=()=>openPin("codes");$("#bSites").onclick=e=>{e.preventDefault();openPin("sites")};
+function codesTable(c){return c.length?`<table><thead><tr><th>Panel</th><th>Item</th><th>Code</th></tr></thead><tbody>${c.map(x=>`<tr><td>${esc(x.panel)}</td><td>${esc(x.item)}</td><td><b>${esc(x.value)}</b></td></tr>`).join("")}</tbody></table><p class="sm mut">Do not write down or share these codes.  Close this window when finished.</p>`:`<p class="mut">No codes have been recorded for this site yet.  Contact the FSG office.</p>`}
 $("#pinGo").onclick=async()=>{const pin=$("#pin").value.trim();$("#pinE").textContent="";
-  const r=await post(MODE==="codes"?{action:"codes",pin,who:$("#pinWho").value.trim()}:{action:"sites",pin});
+  if(MODE==="sites"){const r=await post({action:"sites",office:true,pin});if(!r.ok){$("#pinE").textContent=r.j.error||"Not available.";return}
+    OFFPIN=pin;$("#pinOut").innerHTML=`<table><tbody>${r.j.sites.map(x=>`<tr><td><a href="?s=${encodeURIComponent(x.token)}"><b>${esc(x.name)}</b></a><div class="sm mut">${esc(x.address||"")}</div></td><td style="text-align:right"><button data-site="${esc(x.token)}">Codes</button></td></tr>`).join("")}</tbody></table><div id="siteCodes"></div>`;
+    document.querySelectorAll("[data-site]").forEach(b=>b.onclick=async()=>{const r2=await fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({s:b.dataset.site,action:"codes",office:true,pin:OFFPIN})}).then(x=>x.json());$("#siteCodes").innerHTML=`<h4 style="margin:12px 0 6px">${esc(b.closest("tr").querySelector("b").textContent)}</h4>`+(r2.codes?codesTable(r2.codes):`<p class="err">${esc(r2.error||"Not available")}</p>`)});return}
+  const who=$("#pinWho").value;if(!who){$("#pinE").textContent="Select your name first.";return}
+  localStorage.setItem("elog_eng",who);
+  const r=await post(who==="office"?{action:"codes",office:true,pin}:{action:"codes",engineer_id:Number(who),pin});
   if(!r.ok){$("#pinE").textContent=r.j.error||"Not available.";return}
-  if(MODE==="codes"){const c=r.j.codes||[];$("#pinOut").innerHTML=c.length?`<table><thead><tr><th>Panel</th><th>Item</th><th>Code</th></tr></thead><tbody>${c.map(x=>`<tr><td>${esc(x.panel)}</td><td>${esc(x.item)}</td><td><b>${esc(x.value)}</b></td></tr>`).join("")}</tbody></table><p class="sm mut">Do not write down or share these codes.  Close this window when finished.</p>`:`<p class="mut">No codes have been recorded for this site yet.  Contact the FSG office.</p>`}
-  else{$("#pinOut").innerHTML=`<table><tbody>${r.j.sites.map(x=>`<tr><td><a href="?s=${encodeURIComponent(x.token)}"><b>${esc(x.name)}</b></a><div class="sm mut">${esc(x.address||"")}</div></td></tr>`).join("")}</tbody></table>`}};
+  $("#pinOut").innerHTML=codesTable(r.j.codes||[])};
 $("#pin").onkeydown=e=>{if(e.key==="Enter")$("#pinGo").click()};
 document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>{b.closest(".modal").classList.remove("on");$("#pinOut").innerHTML=""});
 load();
