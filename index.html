@@ -108,7 +108,7 @@ const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const fd=s=>s?new Date(s).toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"}):"–";
 const ft=s=>s?new Date(s).toLocaleString("en-GB",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}):"–";
-const ORDER=["Fire safety","Emergency lighting","Water hygiene","Electrical","Remote monitoring","Security","Access and safety systems","Building fabric","Site services"];
+const ORDER=["Fire safety","Emergency lighting","Water hygiene","Electrical","Lifts","Mechanical","Remote monitoring","Security","Access and safety systems","Building fabric","Site services"];
 const DAY=864e5;
 async function load(){
   if(!TOKEN){$("#app").innerHTML='<div class="loading">This e-logbook link is incomplete.  Please scan the QR code on site again.</div>';return}
@@ -153,13 +153,19 @@ function render(){
     return `<div class="card"><h3>${esc(x)}</h3><span class="pill ${w}">${w==="G"?"Compliant":w==="A"?"Attention":"Overdue"}</span> <span class="big">${ts.length} task${ts.length>1?"s":""}</span><div class="bar"><i style="width:${pd}%;background:${w==="G"?"var(--g)":w==="A"?"var(--a)":"var(--r)"}"></i></div><div class="sm mut" style="margin-top:4px">${Math.round(pd)}% of due visits completed (12 months)</div></div>`}).join("")+`</div></section>`;
   // Fire alarm panels
   const showP=PANEL==="all"?s.panels:s.panels.filter(p=>p.name===PANEL);
-  h+=`<section><h2>Fire alarm panels</h2><div class="grid">`+showP.map(p=>{const ts=D.tests.filter(t=>t.panel===p.name);const l=ts[0];const ok=l&&/pass/i.test(l.result)&&(Date.now()-Date.parse(l.test_at))<9*DAY;
+  const fw=T.find(x=>x.key==="fa_weekly");
+  h+=`<section><h2>Fire alarm panels</h2><div class="grid">`+showP.map(p=>{const ts=D.tests.filter(t=>t.panel===p.name);const l=ts[0];
+    if(!l&&fw){const ld=fw.last;const ok=ld&&(Date.now()-Date.parse(ld.doneAt))<9*DAY;
+      return `<div class="card panel ${ok?"":"warn"}"><h3>${esc(p.name)}</h3><div class="sm mut">${esc(p.ref||"")}</div>
+       <div style="margin-top:8px"><span class="pill ${ok?"G":"A"}">${ld?(ok?"Tested this week":"Weekly test due"):"No test logged"}</span></div>
+       <div class="sm" style="margin-top:8px">Last weekly test: <b>${ld?fd(ld.doneAt):"–"}</b>${ld?.by?"  ·  "+esc(ld.by):""}<br>Next due: ${fw.out.length?`<b style="color:var(--r)">${fd(fw.out[0].due)}</b>`:fd(fw.next?.due)}</div></div>`}
+    const ok=l&&/pass/i.test(l.result)&&(Date.now()-Date.parse(l.test_at))<9*DAY;
     return `<div class="card panel ${ok?"":"warn"}"><h3>${esc(p.name)}</h3><div class="sm mut">${esc(p.ref||"")}</div>
      <div style="margin-top:8px"><span class="pill ${ok?"G":"A"}">${l?(ok?"Normal at last test":"Weekly test due"):"No test logged"}</span></div>
      <div class="sm" style="margin-top:8px">Last weekly test: <b>${l?ft(l.test_at):"–"}</b><br>Call point: ${l?esc(l.cp_location):"–"}<br>Result: ${l?esc(l.result):"–"}  ·  ${l?esc(l.tested_by):""}</div></div>`}).join("")+
-   `<div class="card"><h3>Remote monitoring</h3><div class="sm">${esc(s.monitoring?.type||"")}</div><div class="sm mut" style="margin-top:6px">${esc(s.monitoring?.note||"")}</div>
-     ${(()=>{const t=T.find(x=>x.key==="dualcom");return t?`<div class="sm" style="margin-top:6px">Last service: <b>${fd(t.last?.doneAt)}</b></div>`:""})()}</div></div>
-   <p class="sm mut">Panel status shows the result of the most recent logged weekly test.  It is not a live feed from the panel.</p></section>`;
+   (s.monitoring?`<div class="card"><h3>Remote monitoring</h3><div class="sm">${esc(s.monitoring.type||"")}</div><div class="sm mut" style="margin-top:6px">${esc(s.monitoring.note||"")}</div>
+     ${(()=>{const t=T.find(x=>x.key==="dualcom");return t?`<div class="sm" style="margin-top:6px">Last service: <b>${fd(t.last?.doneAt)}</b></div>`:""})()}</div>`:"")+`</div>
+   <p class="sm mut">Panel status shows the most recent logged weekly test.  It is not a live feed from the panel.</p></section>`;
   // Register
   h+=`<section><h2>Planned maintenance register</h2><table><thead><tr><th>Task</th><th>Last completed</th><th class="hide-s">By</th><th>Next due</th><th>Status</th></tr></thead><tbody>`;
   let cur="";for(const t of T){if(t.section!==cur){cur=t.section;h+=`<tr class="sec"><td colspan="5">${esc(cur)}</td></tr>`}
@@ -167,8 +173,12 @@ function render(){
   h+=`</tbody></table></section>`;
   // Weekly FA log
   const tl=D.tests.filter(t=>PANEL==="all"||t.panel===PANEL);
+  if(!D.tests.length){const fw=D.items.filter(i=>i.key==="fa_weekly"&&i.state==="done").sort((a,b)=>Date.parse(b.doneAt||b.due)-Date.parse(a.doneAt||a.due)).slice(0,26);
+    h+=`<section><h2>Weekly fire alarm test log</h2><table><thead><tr><th>Date</th><th>Task</th><th class="hide-s">Engineer</th></tr></thead><tbody>`+
+     (fw.length?fw.map(i=>`<tr><td>${fd(i.doneAt||i.due)}</td><td>Weekly fire alarm test</td><td class="hide-s">${esc(i.by||"FSG")}</td></tr>`).join(""):`<tr><td colspan="3" class="mut">No tests logged yet.</td></tr>`)+`</tbody></table></section>`;}
+  else{
   h+=`<section><h2>Weekly fire alarm test log${PANEL!=="all"?" – "+esc(PANEL):""}</h2><table><thead><tr><th>Date</th><th>Panel</th><th>Call point tested</th><th>Result</th><th class="hide-s">Tested by</th></tr></thead><tbody>`+
-   (tl.length?tl.slice(0,26).map(t=>`<tr><td>${ft(t.test_at)}</td><td>${esc(t.panel)}</td><td>${esc(t.cp_location||t.cp_ref||"")}</td><td><span class="pill ${/pass/i.test(t.result)?"G":"R"}">${esc(t.result)}</span></td><td class="hide-s">${esc(t.tested_by)}</td></tr>`).join(""):`<tr><td colspan="5" class="mut">No tests logged yet.</td></tr>`)+`</tbody></table></section>`;
+   (tl.length?tl.slice(0,26).map(t=>`<tr><td>${ft(t.test_at)}</td><td>${esc(t.panel)}</td><td>${esc(t.cp_location||t.cp_ref||"")}</td><td><span class="pill ${/pass/i.test(t.result)?"G":"R"}">${esc(t.result)}</span></td><td class="hide-s">${esc(t.tested_by)}</td></tr>`).join(""):`<tr><td colspan="5" class="mut">No tests logged yet.</td></tr>`)+`</tbody></table></section>`;}
   // Visit log
   const vl=[...D.visits].sort((a,b)=>Date.parse(b.date)-Date.parse(a.date)).slice(0,40);
   h+=`<section><h2>Visit log</h2><table><thead><tr><th>Date</th><th>Task</th><th class="hide-s">Engineer</th><th class="hide-s">On site</th></tr></thead><tbody>`+
@@ -201,14 +211,14 @@ async function makePdf(out){
   doc.autoTable({...opts,startY:y,head:[["Area","Tasks","Due visits completed (12 months)","Status"]],columns:[{dataKey:"a"},{dataKey:"n"},{dataKey:"p"},{dataKey:"st"}],
     body:secs.map(x=>{const ts=T.filter(t=>t.section===x);const w=ts.some(t=>t.st==="R")?"R":ts.some(t=>t.st==="A")?"A":"G";return {a:x,n:ts.length,p:Math.round(ts.reduce((a,t)=>a+t.pct,0)/ts.length)+"%",st:w==="G"?"Compliant":w==="A"?"Attention":"Overdue",_st:w}}),...pill()});
   y=h2("Fire alarm panels",doc.lastAutoTable.finalY+10);
-  doc.autoTable({...opts,startY:y,head:[["Panel","Reference","Last weekly test","Call point","Result"]],body:s.panels.map(p=>{const l=D.tests.find(t=>t.panel===p.name);return [p.name,p.ref||"",l?ft(l.test_at):"–",l?l.cp_location:"–",l?l.result+" ("+l.tested_by+")":"No test logged"]})});
-  doc.setFontSize(8);doc.setTextColor(...MUT);doc.text(`Remote monitoring: ${s.monitoring?.type||"–"}.  Panel status reflects the latest logged test, not a live feed.`,14,doc.lastAutoTable.finalY+5);
+  doc.autoTable({...opts,startY:y,head:[["Panel","Reference","Last weekly test","Call point","Result"]],body:s.panels.map(p=>{const l=D.tests.find(t=>t.panel===p.name);const fw=T.find(x=>x.key==="fa_weekly");if(!l&&fw?.last)return [p.name,p.ref||"",fd(fw.last.doneAt),"FSG weekly test visit",fw.last.by||"FSG"];return [p.name,p.ref||"",l?ft(l.test_at):"–",l?l.cp_location:"–",l?l.result+" ("+l.tested_by+")":"No test logged"]})});
+  doc.setFontSize(8);doc.setTextColor(...MUT);doc.text(`${s.monitoring?"Remote monitoring: "+s.monitoring.type+".  ":""}Panel status reflects the latest logged test, not a live feed.`,14,doc.lastAutoTable.finalY+5);
   y=h2("Planned maintenance register",doc.lastAutoTable.finalY+14);
   const rows=[];let cur="";for(const t of T){if(t.section!==cur){cur=t.section;rows.push({t:{content:cur,colSpan:5,styles:{fillColor:[240,241,243],fontStyle:"bold"}}})}
     rows.push({t:t.label,l:fd(t.last?.doneAt),b:t.last?.by||"–",n:t.out.length?fd(t.out[0].due):fd(t.next?.due),st:t.txt,_st:t.st})}
   doc.autoTable({...opts,startY:y,columns:[{header:"Task",dataKey:"t"},{header:"Last completed",dataKey:"l"},{header:"By",dataKey:"b"},{header:"Next due",dataKey:"n"},{header:"Status",dataKey:"st"}],body:rows,...pill()});
   y=h2("Weekly fire alarm test log",doc.lastAutoTable.finalY+10);
-  doc.autoTable({...opts,startY:y,head:[["Date","Panel","Call point tested","Result","Tested by"]],body:D.tests.slice(0,26).map(t=>[ft(t.test_at),t.panel,t.cp_location||t.cp_ref||"",t.result,t.tested_by])});
+  doc.autoTable({...opts,startY:y,head:[["Date","Panel","Call point tested","Result","Tested by"]],body:D.tests.length?D.tests.slice(0,26).map(t=>[ft(t.test_at),t.panel,t.cp_location||t.cp_ref||"",t.result,t.tested_by]):D.items.filter(i=>i.key==="fa_weekly"&&i.state==="done").sort((a,b)=>Date.parse(b.doneAt||b.due)-Date.parse(a.doneAt||a.due)).slice(0,26).map(i=>[fd(i.doneAt||i.due),s.panels[0]?.name||"Panel","FSG weekly test visit","Completed",i.by||"FSG"])});
   y=h2("Visit log",doc.lastAutoTable.finalY+10);
   doc.autoTable({...opts,startY:y,head:[["Date","Task","Engineer","On site"]],body:[...D.visits].sort((a,b)=>Date.parse(b.date)-Date.parse(a.date)).slice(0,40).map(v=>[ft(v.date),v.task,v.who,v.end?Math.max(0,Math.round((Date.parse(v.end)-Date.parse(v.date))/6e4))+" min":"–"])});
   y=h2("Certificates and reports on file",doc.lastAutoTable.finalY+10);
