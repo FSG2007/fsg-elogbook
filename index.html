@@ -258,16 +258,16 @@ async function openPin(m){MODE=m;$("#pinE").textContent="";$("#pinOut").innerHTM
   const e=await loadEng();sel.innerHTML='<option value="">Select your name…</option><option value="office">FSG office (office PIN)</option>'+e.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join("");
   const last=localStorage.getItem("elog_eng");if(last)sel.value=last;sel.focus()}
 $("#bEng").onclick=()=>openPin("codes");$("#bSites").onclick=e=>{e.preventDefault();openPin("sites")};
-function codesTable(c){return c.length?`<table><thead><tr><th>Panel</th><th>Item</th><th>Code</th></tr></thead><tbody>${c.map(x=>`<tr><td>${esc(x.panel)}</td><td>${esc(x.item)}</td><td><b>${esc(x.value)}</b></td></tr>`).join("")}</tbody></table><p class="sm mut">Do not write down or share these codes.  Close this window when finished.</p>`:`<p class="mut">No codes have been recorded for this site yet.  Contact the FSG office.</p>`}
+function codesTable(c){return c.length?`<table><thead><tr><th>Panel</th><th>Item</th><th>Code</th></tr></thead><tbody>${c.map(x=>`<tr><td>${esc(x.panel)}</td><td>${esc(x.item)}</td><td><b>${esc(x.value)}</b></td></tr>`).join("")}</tbody></table><p class="sm mut">Do not write down or share these codes.  Close this window when finished.</p>`:`<p class="mut">No panel codes have been stored for this site yet.  The office will add them once they are received.</p>`}
 $("#pinGo").onclick=async()=>{const pin=$("#pin").value.trim();$("#pinE").textContent="";
   if(MODE==="sites"){const r=await post({action:"sites",office:true,pin});if(!r.ok){$("#pinE").textContent=r.j.error||"Not available.";return}
-    OFFPIN=pin;$("#pinOut").innerHTML=`<table><tbody>${r.j.sites.map(x=>`<tr><td><a href="?s=${encodeURIComponent(x.token)}"><b>${esc(x.name)}</b></a><div class="sm mut">${esc(x.address||"")}</div></td><td style="text-align:right"><button data-site="${esc(x.token)}">Codes</button></td></tr>`).join("")}</tbody></table><div id="siteCodes"></div>`;
+    OFFPIN=pin;$("#pinOut").innerHTML=`<p class="sm" style="color:var(--g);font-weight:600;margin:8px 0">Office PIN accepted.</p><table><tbody>${r.j.sites.map(x=>`<tr><td><a href="?s=${encodeURIComponent(x.token)}"><b>${esc(x.name)}</b></a><div class="sm mut">${esc(x.address||"")}</div></td><td style="text-align:right"><button data-site="${esc(x.token)}">Codes</button></td></tr>`).join("")}</tbody></table><div id="siteCodes"></div>`;
     document.querySelectorAll("[data-site]").forEach(b=>b.onclick=async()=>{const r2=await fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({s:b.dataset.site,action:"codes",office:true,pin:OFFPIN})}).then(x=>x.json());$("#siteCodes").innerHTML=`<h4 style="margin:12px 0 6px">${esc(b.closest("tr").querySelector("b").textContent)}</h4>`+(r2.codes?codesTable(r2.codes):`<p class="err">${esc(r2.error||"Not available")}</p>`)});return}
   const who=$("#pinWho").value;if(!who){$("#pinE").textContent="Select your name first.";return}
   localStorage.setItem("elog_eng",who);
   const r=await post(who==="office"?{action:"codes",office:true,pin}:{action:"codes",engineer_id:Number(who),pin});
   if(!r.ok){$("#pinE").textContent=r.j.error||"Not available.";return}
-  $("#pinOut").innerHTML=codesTable(r.j.codes||[])};
+  $("#pinOut").innerHTML=`<p class="sm" style="color:var(--g);font-weight:600;margin:8px 0">PIN accepted.  Signed in as ${esc(r.j.name||"")}.</p>`+codesTable(r.j.codes||[])};
 $("#pin").onkeydown=e=>{if(e.key==="Enter")$("#pinGo").click()};
 document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>{b.closest(".modal").classList.remove("on");$("#pinOut").innerHTML=""});
 load();
