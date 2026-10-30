@@ -146,6 +146,7 @@ function render(){
   h+=`<div class="site"><div><h2>${esc(s.name)}</h2><div class="s">${esc(s.address)}</div><div class="s sm">Client: ${esc(s.client)}</div>
    <div class="tabs">${["all",...panels].map(p=>`<button class="tab ${PANEL===p?"on":""}" data-p="${esc(p)}">${p==="all"?"Whole site":esc(p)}</button>`).join("")}</div></div>
    <div class="sm mut" style="text-align:right">Record updated<br><b>${ft(D.refreshed_at)}</b></div></div>`;
+  if((D.faults||[]).some(f=>f.status!=="closed"))h+=`<div class="card" style="border-left:5px solid var(--r);margin-bottom:12px"><b>${(D.faults||[]).filter(f=>f.status!=="closed").length} open fire alarm fault(s) or disablement(s)</b> <span class="sm mut">  See "Open faults and disablements" below.</span></div>`;
   // Summary by section
   const secs=ORDER.filter(x=>T.some(t=>t.section===x));
   h+=`<section><h2>Compliance summary</h2><div class="grid">`+secs.map(x=>{const ts=T.filter(t=>t.section===x);const w=ts.some(t=>t.st==="R")?"R":ts.some(t=>t.st==="A")?"A":"G";
@@ -155,9 +156,10 @@ function render(){
   const showP=PANEL==="all"?s.panels:s.panels.filter(p=>p.name===PANEL);
   const fw=T.find(x=>x.key==="fa_weekly");
   h+=`<section><h2>Fire alarm panels</h2><div class="grid">`+showP.map(p=>{const ts=D.tests.filter(t=>t.panel===p.name);const l=ts[0];
-    if(!l&&fw){const ld=fw.last;const ok=ld&&(Date.now()-Date.parse(ld.doneAt))<9*DAY;
+    const nOpen=(D.faults||[]).filter(f=>f.status!=="closed"&&(!f.panel||f.panel===p.name)).length;
+    if(!l&&fw){const ld=fw.last;const tested=ld&&(Date.now()-Date.parse(ld.doneAt))<9*DAY;const ok=tested&&!nOpen;
       return `<div class="card panel ${ok?"":"warn"}"><h3>${esc(p.name)}</h3><div class="sm mut">${esc(p.ref||"")}</div>
-       <div style="margin-top:8px"><span class="pill ${ok?"G":"A"}">${ld?(ok?"Tested this week":"Weekly test due"):"No test logged"}</span></div>
+       <div style="margin-top:8px"><span class="pill ${ok?"G":"A"}">${!ld?"No test logged":!tested?"Weekly test due":nOpen?`Tested this week  ·  ${nOpen} open fault${nOpen>1?"s":""}`:"Tested this week"}</span></div>
        <div class="sm" style="margin-top:8px">Last weekly test: <b>${ld?fd(ld.doneAt):"–"}</b>${ld?.by?"  ·  "+esc(ld.by):""}<br>Next due: ${fw.out.length?`<b style="color:var(--r)">${fd(fw.out[0].due)}</b>`:fd(fw.next?.due)}</div></div>`}
     const ok=l&&/pass/i.test(l.result)&&(Date.now()-Date.parse(l.test_at))<9*DAY;
     return `<div class="card panel ${ok?"":"warn"}"><h3>${esc(p.name)}</h3><div class="sm mut">${esc(p.ref||"")}</div>
@@ -166,6 +168,17 @@ function render(){
    (s.monitoring?`<div class="card"><h3>Remote monitoring</h3><div class="sm">${esc(s.monitoring.type||"")}</div><div class="sm mut" style="margin-top:6px">${esc(s.monitoring.note||"")}</div>
      ${(()=>{const t=T.find(x=>x.key==="dualcom");return t?`<div class="sm" style="margin-top:6px">Last service: <b>${fd(t.last?.doneAt)}</b></div>`:""})()}</div>`:"")+`</div>
    <p class="sm mut">Panel status shows the most recent logged weekly test.  It is not a live feed from the panel.</p></section>`;
+  // Faults and disablements
+  const FO=(D.faults||[]).filter(f=>f.status!=="closed"),FC=(D.faults||[]).filter(f=>f.status==="closed"&&Date.now()-Date.parse(f.closed_at)<90*DAY);
+  if(FO.length||FC.length){
+    h+=`<section><h2>Open faults and disablements</h2><div class="grid" style="grid-template-columns:1fr">`+FO.map(f=>`<div class="card" style="border-left:5px solid var(--r)">
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><h3>${esc(f.title)}</h3><span class="pill R">Open since ${fd(f.raised_at)}</span></div>
+      <div class="sm">${esc(f.detail||"")}</div>
+      <div class="sm" style="margin-top:6px"><b>Explanation:</b> ${f.explanation?esc(f.explanation):'<span class="mut">Awaiting explanation from FSG.</span>'}</div>
+      ${f.action?`<div class="sm" style="margin-top:4px"><b>Action:</b> ${esc(f.action)}</div>`:""}
+      <div class="sm mut" style="margin-top:4px">Source: ${esc(f.source||"")}</div></div>`).join("")+
+      FC.map(f=>`<div class="card" style="border-left:5px solid var(--g)"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><h3>${esc(f.title)}</h3><span class="pill G">Resolved ${fd(f.closed_at)}</span></div><div class="sm">${esc(f.explanation||f.detail||"")}</div></div>`).join("")+`</div></section>`;
+  }
   // Register
   h+=`<section><h2>Planned maintenance register</h2><table><thead><tr><th>Task</th><th>Last completed</th><th class="hide-s">By</th><th>Next due</th><th>Status</th></tr></thead><tbody>`;
   let cur="";for(const t of T){if(t.section!==cur){cur=t.section;h+=`<tr class="sec"><td colspan="5">${esc(cur)}</td></tr>`}
@@ -213,7 +226,9 @@ async function makePdf(out){
   y=h2("Fire alarm panels",doc.lastAutoTable.finalY+10);
   doc.autoTable({...opts,startY:y,head:[["Panel","Reference","Last weekly test","Call point","Result"]],body:s.panels.map(p=>{const l=D.tests.find(t=>t.panel===p.name);const fw=T.find(x=>x.key==="fa_weekly");if(!l&&fw?.last)return [p.name,p.ref||"",fd(fw.last.doneAt),"FSG weekly test visit",fw.last.by||"FSG"];return [p.name,p.ref||"",l?ft(l.test_at):"–",l?l.cp_location:"–",l?l.result+" ("+l.tested_by+")":"No test logged"]})});
   doc.setFontSize(8);doc.setTextColor(...MUT);doc.text(`${s.monitoring?"Remote monitoring: "+s.monitoring.type+".  ":""}Panel status reflects the latest logged test, not a live feed.`,14,doc.lastAutoTable.finalY+5);
-  y=h2("Planned maintenance register",doc.lastAutoTable.finalY+14);
+  let yy=doc.lastAutoTable.finalY+14;const FO=(D.faults||[]).filter(f=>f.status!=="closed");
+  if(FO.length){y=h2("Open faults and disablements",yy);doc.autoTable({...opts,startY:y,head:[["Fault","Since","Detail","Explanation and action"]],columnStyles:{0:{fontStyle:"bold",textColor:[198,47,29],cellWidth:38},1:{cellWidth:20}},body:FO.map(f=>[f.title,fd(f.raised_at),f.detail||"",(f.explanation||"Awaiting explanation from FSG.")+(f.action?"  Action: "+f.action:"")])});yy=doc.lastAutoTable.finalY+10}
+  y=h2("Planned maintenance register",yy);
   const rows=[];let cur="";for(const t of T){if(t.section!==cur){cur=t.section;rows.push({t:{content:cur,colSpan:5,styles:{fillColor:[240,241,243],fontStyle:"bold"}}})}
     rows.push({t:t.label,l:fd(t.last?.doneAt),b:t.last?.by||"–",n:t.out.length?fd(t.out[0].due):fd(t.next?.due),st:t.txt,_st:t.st})}
   doc.autoTable({...opts,startY:y,columns:[{header:"Task",dataKey:"t"},{header:"Last completed",dataKey:"l"},{header:"By",dataKey:"b"},{header:"Next due",dataKey:"n"},{header:"Status",dataKey:"st"}],body:rows,...pill()});
