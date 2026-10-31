@@ -13,12 +13,18 @@ function visitPill(v){if(v.done)return `<span class="pill G">Completed${v.done_d
 const lastTxt=s=>cont(s)?"Monitored 24/7":fd(s.last_done);const nextTxt=s=>cont(s)?"Continuous":s.next_due?fd(s.next_due):/Annual|6-monthly/.test(s.freq||"")?"Next contract year":"–";
 const svcLabel=s=>{const [a,b]=String(s).split(";");return b?`<b>${esc(a.trim())}</b><div class="sm mut">${esc(b.trim())}</div>`:`<b>${esc(a)}</b>`};
 let charts=[];
+const CPB=new URL(".",(document.currentScript&&document.currentScript.src)||location.href).href;
+const hexRgb=h=>{const m=String(h||"").match(/^#?([0-9a-f]{6})$/i);if(!m)return null;const n=parseInt(m[1],16);return[n>>16&255,n>>8&255,n&255]};
+const tint=(rgb,a)=>`rgba(${rgb[0]},${rgb[1]},${rgb[2]},${a})`;
+function applyBrand(b){const r=document.documentElement.style;const c=b&&hexRgb(b.color);if(c){r.setProperty("--acc",b.color);r.setProperty("--acc2",tint(c,.35))}else{r.removeProperty("--acc");r.removeProperty("--acc2")}}
+const brandImg=(src,w)=>new Promise(res=>{if(!src)return res(null);const i=new Image();i.onload=()=>{const W=w||1200,H=Math.round(W*(i.naturalHeight||40)/(i.naturalWidth||170));const c=document.createElement("canvas");c.width=W;c.height=H;c.getContext("2d").drawImage(i,0,0,W,H);res({url:c.toDataURL("image/png"),ar:H/W})};i.onerror=()=>res(null);i.src=CPB+src});
 function renderReport(el,d,opts={}){
   charts.forEach(c=>c.destroy());charts=[];const S=d.summary;const sites=[...new Set(d.services.map(s=>s.site))];
   const statusCount={up:d.services.filter(s=>s.status==="Up to date"||cont(s)).length,prog:d.services.filter(s=>s.status==="Outstanding"&&!cont(s)).length,sch:d.services.filter(s=>s.status==="Scheduled").length};
+  const B=d.brand||null;applyBrand(B);const AC=(B&&B.color)||"#2f3337",AC2=B&&hexRgb(B.color)?tint(hexRgb(B.color),.3):"#f3b3a8";
   el.innerHTML=`
   ${opts.banner||""}
-  <div class="hero"><div class="k">Monthly facilities management report</div><h1>${esc(d.account.name)} · ${esc(d.period_label)}</h1>
+  <div class="hero${B?" br":""}">${B&&B.logo_white?`<img class="clogo" src="${CPB+B.logo_white}" alt="${esc(B.name||"")}">`:""}<div class="k">Monthly facilities management report</div><h1>${esc(d.account.name)} · ${esc(d.period_label)}</h1>
    <p>${d.sites.map(s=>esc(s.label)).join("  ·  ")}</p><p class="sm" style="margin-top:10px">Prepared by Facility Services Group Limited  ·  generated ${fd(d.generated_at.slice(0,10))}</p></div>
   ${d.commentary?`<div class="card"><h2>Account manager&rsquo;s summary</h2><div style="white-space:pre-wrap">${esc(d.commentary)}</div></div>`:""}
   <div class="kpis">
@@ -56,21 +62,21 @@ function renderReport(el,d,opts={}){
   const ring=(id,v,col)=>charts.push(new Chart(document.getElementById(id),{type:"doughnut",data:{datasets:[{data:[v,100-v],backgroundColor:[col,"#e9ebee"],borderWidth:0}]},options:{cutout:"72%",plugins:{legend:{display:false},tooltip:{enabled:false}},animation:false}}));
   ring("r1",pct(S.ppm_done,S.ppm_due),"#e8432e");ring("r2",pct(S.ppm_12m_done,S.ppm_12m_due),"#1f8a4c");
   const lab=d.trend.map(t=>new Date(t.month+"-15").toLocaleDateString("en-GB",{month:"short"}));
-  charts.push(new Chart(document.getElementById("c1"),{type:"bar",data:{labels:lab,datasets:[{label:"Completed",data:d.trend.map(t=>t.done),backgroundColor:"#2f3337",borderRadius:4},{label:"Planned",data:d.trend.map(t=>t.due-t.done),backgroundColor:"#f3b3a8",borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{position:"bottom"}},scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true}}}}));
+  charts.push(new Chart(document.getElementById("c1"),{type:"bar",data:{labels:lab,datasets:[{label:"Completed",data:d.trend.map(t=>t.done),backgroundColor:AC,borderRadius:4},{label:"Planned",data:d.trend.map(t=>t.due-t.done),backgroundColor:AC2,borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{position:"bottom"}},scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true}}}}));
   charts.push(new Chart(document.getElementById("c2"),{type:"doughnut",data:{labels:["Up to date","In progress or booked","Scheduled"],datasets:[{data:[statusCount.up,statusCount.prog,statusCount.sch],backgroundColor:["#1f8a4c","#2d6cdf","#9aa0a6"],borderWidth:0}]},options:{maintainAspectRatio:false,animation:false,cutout:"62%",plugins:{legend:{position:"bottom"}}}}));
 }
 async function reportPdf(d){
-  const {jsPDF}=window.jspdf;const doc=new jsPDF({unit:"mm",format:"a4"});const RED=[232,67,46],INK=[47,51,55],MUT=[107,113,120];const S=d.summary;
+  const {jsPDF}=window.jspdf;const doc=new jsPDF({unit:"mm",format:"a4"});const B=d.brand||null;const RED=(B&&hexRgb(B.color))||[232,67,46],INK=[47,51,55],MUT=[107,113,120];const [cl,clw]=await Promise.all([brandImg(B&&B.logo,900),brandImg(B&&B.logo_white,900)]);const S=d.summary;
   const logo=await new Promise(r=>{const i=new Image();i.crossOrigin="anonymous";i.onload=()=>{const c=document.createElement("canvas");c.width=i.width;c.height=i.height;c.getContext("2d").drawImage(i,0,0);r(c.toDataURL("image/jpeg",.92))};i.onerror=()=>r(null);i.src=(location.pathname.includes("/review/")?"../../":"../")+"fsg-logo.jpg"});
-  const head=()=>{doc.setFillColor(...RED);doc.rect(0,0,210,3,"F");if(logo)doc.addImage(logo,"JPEG",14,7,22,11);doc.setFont("helvetica","bold");doc.setFontSize(10);doc.setTextColor(...INK);doc.text(`${d.account.name}  ·  ${d.period_label}`,196,13,{align:"right"});doc.setFont("helvetica","normal");doc.setFontSize(8);doc.setTextColor(...MUT);doc.text("Monthly facilities management report",196,17.5,{align:"right"})};
+  const head=()=>{doc.setFillColor(...RED);doc.rect(0,0,210,3,"F");if(logo)doc.addImage(logo,"JPEG",14,7,22,11);doc.setFont("helvetica","bold");doc.setFontSize(10);doc.setTextColor(...INK);const tx=cl?163:196;doc.text(`${d.account.name}  ·  ${d.period_label}`,tx,13,{align:"right"});doc.setFont("helvetica","normal");doc.setFontSize(8);doc.setTextColor(...MUT);doc.text("Monthly facilities management report",tx,17.5,{align:"right"});if(cl){doc.setDrawColor(227,229,232);doc.line(167,8,167,19);doc.addImage(cl.url,"PNG",170,13.5-13*cl.ar,26,26*cl.ar)}};
   const foot=()=>{const n=doc.getNumberOfPages();for(let i=1;i<=n;i++){doc.setPage(i);doc.setFontSize(7.5);doc.setTextColor(...MUT);doc.text("Facility Services Group Limited  ·  01792 898040  ·  info@fsgfm.co.uk",14,289);doc.text(`Page ${i} of ${n}`,196,289,{align:"right"})}};
   const h2=(t,y)=>{doc.setFillColor(...RED);doc.rect(14,y-4,1.6,5.5,"F");doc.setFont("helvetica","bold");doc.setFontSize(12.5);doc.setTextColor(...INK);doc.text(t,18,y);return y+4};
   const T={theme:"grid",rowPageBreak:"avoid",styles:{fontSize:8.2,cellPadding:2,lineColor:[227,229,232],textColor:INK},headStyles:{fillColor:[47,51,55],textColor:255,fontStyle:"bold"},alternateRowStyles:{fillColor:[250,251,252]},margin:{left:14,right:14,top:31},didDrawPage:head};
   // cover
-  doc.setFillColor(47,51,55);doc.rect(0,0,210,297,"F");doc.setFillColor(...RED);doc.rect(0,0,210,6,"F");doc.circle(200,40,55,"F");doc.setFillColor(47,51,55);doc.circle(200,40,47,"F");
+  const CV=B?[0,0,0]:[47,51,55];doc.setFillColor(...CV);doc.rect(0,0,210,297,"F");doc.setFillColor(...RED);doc.rect(0,0,210,6,"F");doc.circle(200,40,55,"F");doc.setFillColor(...CV);doc.circle(200,40,47,"F");if(B){doc.setFillColor(...RED);doc.rect(0,291,210,6,"F")}
   if(logo){doc.setFillColor(255,255,255);doc.roundedRect(14,22,58,30,3,3,"F");doc.addImage(logo,"JPEG",18,26,50,22)}
-  doc.setTextColor(255,255,255);doc.setFont("helvetica","normal");doc.setFontSize(11);doc.text("MONTHLY FACILITIES MANAGEMENT REPORT",14,120);
-  doc.setFont("helvetica","bold");doc.setFontSize(30);doc.text(d.account.name,14,136);doc.setFontSize(22);doc.setTextColor(...RED);doc.text(d.period_label,14,150);
+  if(clw)doc.addImage(clw.url,"PNG",14,88,70,70*clw.ar);doc.setTextColor(255,255,255);doc.setFont("helvetica","normal");doc.setFontSize(11);doc.text("MONTHLY FACILITIES MANAGEMENT REPORT",14,120);
+  doc.setFont("helvetica","bold");doc.setFontSize(30);doc.text(d.account.name,14,136);doc.setFontSize(22);doc.setTextColor(...(B?[120,190,235]:RED));doc.text(d.period_label,14,150);
   doc.setTextColor(220,222,225);doc.setFont("helvetica","normal");doc.setFontSize(10.5);doc.text(doc.splitTextToSize(d.sites.map(s=>s.label).join("\n"),170),14,166);
   doc.setFontSize(9);doc.text(`Prepared by Facility Services Group Limited  ·  ${fd(d.generated_at.slice(0,10))}`,14,270);
   // summary page

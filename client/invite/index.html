@@ -1,0 +1,17 @@
+<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
+<title>Approve client portal access</title><link rel="icon" href="../../fsg-logo.jpg"><link rel="stylesheet" href="../app.css?v=2">
+<script src="../report.js?v=2"></script></head><body>
+<header class="top"><div class="wrap"><img src="../../fsg-logo.jpg" alt="FSG"><div class="brand"><b>Client portal access</b><span>Internal: FSG staff only</span></div></div></header>
+<main class="wrap" id="app" style="max-width:640px"><div class="card mut">Loading…</div></main>
+<script>
+const $=s=>document.querySelector(s);const t=new URLSearchParams(location.search).get("t")||"";
+(async()=>{let j;try{j=await call({op:"invite_get",t})}catch(e){$("#app").innerHTML=`<div class="card">${esc(e.message)}</div>`;return}const i=j.invite;
+$("#app").innerHTML=`<div class="card"><h2>Approve portal access</h2><p>${esc(i.invited_by||"The client")} at <b>${esc(i.account)}</b> has asked to add a colleague:</p>
+<table><tr><th>Name</th><td>${esc(i.name)}</td></tr><tr><th>Email</th><td>${esc(i.email)}</td></tr><tr><th>Job title</th><td>${esc(i.job_title||"–")}</td></tr><tr><th>Access</th><td>${i.role==="admin"?"Administrator (can add and remove users)":"Standard user"}</td></tr></table>
+<p class="sm mut" style="margin-top:12px">If you approve, they're emailed a personal set-up link straight away, with the account manager copied.  If you decline, nothing is sent to them.</p>
+<label class="sm">Your name</label><input id="by" placeholder="e.g. Neil Evans"><div class="err" id="err"></div>
+<div class="row" style="gap:10px"><button class="pri" id="ok">Approve and send invitation</button><button class="sec" id="no">Decline</button></div></div>`;
+const go=async d=>{const by=$("#by").value.trim();if(by.length<3){$("#err").textContent="Please enter your name.";return}if(d==="decline"&&!confirm("Decline this request?  Nothing will be sent to them."))return;
+ $("#ok").disabled=$("#no").disabled=true;try{await call({op:"invite_decide",t,decision:d,by});$("#app").innerHTML=`<div class="card"><h2>${d==="approve"?"Invitation sent":"Request declined"}</h2><p>${d==="approve"?esc(i.name)+" has been emailed a set-up link.":"Nothing was sent to "+esc(i.name)+"."}  A note has gone to ppm@ and the account manager.</p></div>`}catch(e){$("#err").textContent=e.message;$("#ok").disabled=$("#no").disabled=false}};
+$("#ok").onclick=()=>go("approve");$("#no").onclick=()=>go("decline")})();
+</script></body></html>

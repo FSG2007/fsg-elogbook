@@ -1,17 +1,19 @@
 <!doctype html><html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
-<title>FSG Client Portal</title><link rel="icon" href="../fsg-logo.jpg"><link rel="stylesheet" href="app.css?v=1">
+<title>FSG Client Portal</title><link rel="icon" href="../fsg-logo.jpg"><link rel="stylesheet" href="app.css?v=2">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
-<script src="report.js?v=1"></script></head><body>
-<header class="top"><div class="wrap"><img src="../fsg-logo.jpg" alt="FSG"><div class="brand"><b>Client Portal</b><span>Facility Services Group Limited</span></div><div class="sp"></div><div class="who" id="who"></div></div></header>
+<script src="report.js?v=2"></script></head><body>
+<header class="top"><div class="wrap"><div class="cob"><img src="../fsg-logo.jpg" alt="FSG"><span class="bar hide" id="cbar"></span><img class="cl hide" id="clogo" alt=""></div><div class="brand"><b>Client Portal</b><span id="bsub">Facility Services Group Limited</span></div><div class="sp"></div><div class="who" id="who"></div></div></header>
 <nav class="tabs hide" id="nav"><div class="wrap">
- <button data-t="dash" class="on">Dashboard</button><button data-t="reports">Monthly reports</button><button data-t="files">File logbook</button><button data-t="assets">Assets and systems</button><button data-t="fb">Suggestions</button><button data-t="contact">Contact</button></div></nav>
+ <button data-t="dash" class="on">Dashboard</button><button data-t="reports">Monthly reports</button><button data-t="files">File logbook</button><button data-t="assets">Assets and systems</button><button data-t="fb">Suggestions</button><button data-t="users" class="hide" id="tusers">Users</button><button data-t="contact">Contact</button></div></nav>
 <main class="wrap" id="app"></main>
 <footer>Facility Services Group Limited · 01792 898040 · info@fsgfm.co.uk<br>Your information is private to your organisation.  Every sign-in is logged.</footer>
 <script>
 const $=s=>document.querySelector(s);let S=localStorage.getItem("fsg_cp")||"";let H=null,cur=null,ftr={site:"All",cat:"All",q:""};
 const qs=new URLSearchParams(location.search);
+function setBrand(acc){const b=acc&&acc.brand;applyBrand(b);document.body.classList.toggle("br",!!b);const l=$("#clogo");if(b&&b.logo){l.src=CPB+b.logo;l.alt=b.name||"";l.classList.remove("hide");$("#cbar").classList.remove("hide");$("#bsub").textContent=(acc.name?acc.name+" · ":"")+"by Facility Services Group";localStorage.setItem("fsg_cp_brand",JSON.stringify({name:acc.name,brand:b}))}else{l.classList.add("hide");$("#cbar").classList.add("hide");$("#bsub").textContent="Facility Services Group Limited"}}
+try{const sb=JSON.parse(localStorage.getItem("fsg_cp_brand")||"null");if(sb)setBrand(sb)}catch(e){}
 function loginView(msg=""){$("#nav").classList.add("hide");$("#who").innerHTML="";
  $("#app").innerHTML=`<div class="login"><div class="card"><h1>Sign in</h1><p class="mut sm">Your FSG client portal: monthly contract reports, certificates and service records.</p>
  <label class="sm">Email</label><input id="em" type="email" autocomplete="username"><div style="height:10px"></div><label class="sm">Password</label><input id="pw" type="password" autocomplete="current-password">
@@ -27,6 +29,7 @@ function setupView(t){$("#app").innerHTML=`<div class="login"><div class="card">
 async function load(){try{H=await call({op:"home",session:S})}catch(e){if(e.status===401){localStorage.removeItem("fsg_cp");return loginView()}$("#app").innerHTML=`<div class="card">${esc(e.message)}</div>`;return}
  $("#nav").classList.remove("hide");$("#who").innerHTML=`${esc(H.user.name||H.user.email)}<br><span>${esc(H.account.name)}</span> <button class="ghost" id="out" style="padding:5px 10px">Sign out</button>`;
  $("#out").onclick=async()=>{await call({op:"logout",session:S}).catch(()=>{});localStorage.removeItem("fsg_cp");S="";loginView()};
+ setBrand(H.account);$("#tusers").classList.toggle("hide",H.user.role!=="admin");
  cur=H.latest;tab("dash")}
 const isPrev=c=>!!(c&&(c.preview||(H.reports.find(r=>r.id===c.id)||{}).preview));
 function tab(t){document.querySelectorAll("nav.tabs button").forEach(b=>b.classList.toggle("on",b.dataset.t===t));const A=$("#app");window.scrollTo(0,0);
@@ -44,6 +47,7 @@ function tab(t){document.querySelectorAll("nav.tabs button").forEach(b=>b.classL
   <p class="sm mut">Your account manager, ${esc(H.account.account_manager_name||"")}, will reply within one working day.</p></div>
   <div class="card"><h2>Your previous messages</h2>${H.feedback.length?H.feedback.map(f=>`<div style="border-bottom:1px solid var(--line);padding:8px 0"><div class="sm mut">${fd(f.created_at.slice(0,10))}</div>${esc(f.message)}${f.response?`<div class="sm" style="margin-top:4px"><b>FSG:</b> ${esc(f.response)}</div>`:""}</div>`).join(""):'<p class="mut">None yet.</p>'}</div></div>`;
   $("#send").onclick=async()=>{try{await call({op:"feedback",session:S,kind:$("#k").value,message:$("#msg").value});H=await call({op:"home",session:S});tab("fb");setTimeout(()=>{$("#err").style.color="var(--g)";$("#err").textContent="Thank you.  Your message has been sent to FSG."},50)}catch(e){$("#err").textContent=e.message}}}
+ if(t==="users")users();
  if(t==="contact"){A.innerHTML=`<div class="card"><h2>Contact</h2><p><b>Account manager:</b> ${esc(H.account.account_manager_name||"")}<br><a href="mailto:${esc(H.account.account_manager_email)}">${esc(H.account.account_manager_email)}</a></p><p><b>Helpdesk:</b> 01792 898040 · <a href="mailto:helpdesk@fsgfm.co.uk">helpdesk@fsgfm.co.uk</a></p><p class="sm mut">For an emergency, please phone the helpdesk.</p></div>`}}
 function files(){const F=H.files;const sites=["All",...new Set(F.map(f=>f.site))],cats=["All",...new Set(F.map(f=>f.category))].sort();
  const list=F.filter(f=>(ftr.site==="All"||f.site===ftr.site)&&(ftr.cat==="All"||f.category===ftr.cat)&&(!ftr.q||(f.title+" "+f.category).toLowerCase().includes(ftr.q.toLowerCase())));
@@ -55,5 +59,16 @@ function files(){const F=H.files;const sites=["All",...new Set(F.map(f=>f.site))
  const open=async(id,dl)=>{const w=dl?null:window.open("about:blank");try{const j=await call({op:"file",session:S,id,download:dl});if(dl)location.href=j.url;else w.location=j.url}catch(e){if(w)w.close();alert(e.message)}};
  document.querySelectorAll("[data-o]").forEach(b=>b.onclick=()=>open(b.dataset.o,false));document.querySelectorAll("[data-d]").forEach(b=>b.onclick=()=>open(b.dataset.d,true))}
 document.querySelectorAll("nav.tabs button").forEach(b=>b.onclick=()=>tab(b.dataset.t));
+async function users(msg=""){const A=$("#app");A.innerHTML='<div class="card mut">Loading…</div>';let U;try{U=await call({op:"users_list",session:S})}catch(e){A.innerHTML=`<div class="card">${esc(e.message)}</div>`;return}
+ const st=u=>u.status==="pending_approval"?'<span class="tag pe">Being set up</span>':u.status==="invited"?'<span class="tag pe">Invited, not signed in yet</span>':u.status==="not_invited"?'<span class="tag">Not invited yet</span>':(u.last_login?`<span class="sm mut">Last signed in ${fd(u.last_login.slice(0,10))}</span>`:'<span class="sm mut">Not signed in yet</span>');
+ const dom=(U.allowed_domains||[]).map(d=>"@"+d).join(" or ");
+ A.innerHTML=`<div class="card"><h2>Users</h2><p class="sm mut">Everyone at your organisation who can sign in to this portal.  Administrators can add and remove colleagues.</p>
+ <table class="utbl"><tr><th>Name</th><th class="hide-s">Email</th><th>Access</th><th>Status</th><th></th></tr>${U.users.map(u=>`<tr><td><b>${esc(u.name||"")}</b>${u.me?' <span class="sm mut">(you)</span>':""}${u.job_title?`<div class="sm mut">${esc(u.job_title)}</div>`:""}<div class="sm mut" style="display:none" data-m>${esc(u.email)}</div></td><td class="hide-s">${esc(u.email)}</td><td>${u.role==="admin"?'<span class="tag ad">Administrator</span>':'<span class="tag">User</span>'}</td><td>${st(u)}</td><td class="r">${u.me?"":`<button class="ghost sm" data-r="${u.id}" data-role="${u.role==="admin"?"user":"admin"}" style="padding:5px 10px">${u.role==="admin"?"Make user":"Make admin"}</button> <button class="ghost sm" data-x="${u.id}" data-n="${esc(u.name||u.email)}" style="padding:5px 10px">Remove</button>`}</td></tr>`).join("")}</table></div>
+ <div class="card"><h2>Add a colleague</h2><p class="sm mut">They'll get an email with a personal link to set their password.${dom?`  For security, their email address must end ${esc(dom)}.`:""}${U.needs_approval?"  FSG confirms each new user first, usually within one working day.":""}</p>
+ <div class="grid2" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px"><div><label class="sm">Full name</label><input id="un"></div><div><label class="sm">Work email</label><input id="ue" type="email"></div><div><label class="sm">Job title (optional)</label><input id="uj"></div><div><label class="sm">Access</label><select id="ur"><option value="user">User: can view reports and files</option><option value="admin">Administrator: can also manage users</option></select></div></div>
+ <div class="err" id="err" style="color:${msg?"#1f8a4c":""}">${esc(msg)}</div><button class="pri" id="uadd">Add colleague</button></div>`;
+ $("#uadd").onclick=async()=>{const e=$("#err");e.style.color="";e.textContent="";$("#uadd").disabled=true;try{const j=await call({op:"user_invite",session:S,name:$("#un").value,email:$("#ue").value,job_title:$("#uj").value,role:$("#ur").value});users(j.message)}catch(x){e.textContent=x.message;$("#uadd").disabled=false}};
+ A.querySelectorAll("[data-x]").forEach(b=>b.onclick=async()=>{if(!confirm(`Remove portal access for ${b.dataset.n}?  They will be signed out straight away.`))return;try{await call({op:"user_remove",session:S,id:b.dataset.x});users(`Access removed for ${b.dataset.n}.`)}catch(x){alert(x.message)}});
+ A.querySelectorAll("[data-r]").forEach(b=>b.onclick=async()=>{try{await call({op:"user_role",session:S,id:b.dataset.r,role:b.dataset.role});users("Access updated.")}catch(x){alert(x.message)}})}
 qs.get("setup")?setupView(qs.get("setup")):S?load():loginView();
 </script></body></html>
