@@ -17,12 +17,13 @@ function loginView(msg=""){$("#nav").classList.add("hide");$("#who").innerHTML="
  <label class="sm">Email</label><input id="em" type="email" autocomplete="username"><div style="height:10px"></div><label class="sm">Password</label><input id="pw" type="password" autocomplete="current-password">
  <div class="err" id="err">${esc(msg)}</div><button class="pri" id="go" style="width:100%">Sign in</button>
  <p class="sm mut" style="margin-top:14px">Forgotten your password, or need access for a colleague?  Contact your FSG account manager.</p></div></div>`;
- const go=async()=>{$("#err").textContent="";try{const j=await call({op:"login",email:$("#em").value,password:$("#pw").value});S=j.session;localStorage.setItem("fsg_cp",S);load()}catch(e){$("#err").textContent=e.message}};
+ const go=async()=>{$("#err").textContent="";try{const j=await call({op:"login",email:$("#em").value,password:$("#pw").value});S=j.session;localStorage.setItem("fsg_cp",S);localStorage.setItem("fsg_cp_em",$("#em").value.trim());load()}catch(e){$("#err").textContent=e.message}};
+ const pe=localStorage.getItem("fsg_cp_em");if(pe){$("#em").value=pe;$("#pw").focus()}
  $("#go").onclick=go;$("#pw").onkeydown=e=>{if(e.key==="Enter")go()}}
 function setupView(t){$("#app").innerHTML=`<div class="login"><div class="card"><h1>Set your password</h1><p class="mut sm">Welcome to your FSG client portal.  Choose a password of at least 10 characters.</p>
  <input id="p1" type="password" placeholder="New password" autocomplete="new-password"><div style="height:10px"></div><input id="p2" type="password" placeholder="Confirm password" autocomplete="new-password">
  <div class="err" id="err"></div><button class="pri" id="go" style="width:100%">Save and continue</button></div></div>`;
- $("#go").onclick=async()=>{if($("#p1").value!==$("#p2").value){$("#err").textContent="The passwords don't match.";return}try{await call({op:"setup",setup:t,password:$("#p1").value});history.replaceState(null,"",location.pathname);loginView("Password saved.  Please sign in.")}catch(e){$("#err").textContent=e.message}}}
+ $("#go").onclick=async()=>{if($("#p1").value!==$("#p2").value){$("#err").textContent="The passwords don't match.";return}try{const j=await call({op:"setup",setup:t,password:$("#p1").value});if(j.email)localStorage.setItem("fsg_cp_em",j.email);history.replaceState(null,"",location.pathname);loginView("Password saved.  Please sign in.")}catch(e){$("#err").textContent=e.message}}}
 async function load(){try{H=await call({op:"home",session:S})}catch(e){if(e.status===401){localStorage.removeItem("fsg_cp");return loginView()}$("#app").innerHTML=`<div class="card">${esc(e.message)}</div>`;return}
  $("#nav").classList.remove("hide");$("#who").innerHTML=`${esc(H.user.name||H.user.email)}<br><span>${esc(H.account.name)}</span> <button class="ghost" id="out" style="padding:5px 10px">Sign out</button>`;
  $("#out").onclick=async()=>{await call({op:"logout",session:S}).catch(()=>{});localStorage.removeItem("fsg_cp");S="";loginView()};
