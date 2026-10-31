@@ -5,7 +5,7 @@
 <title>FSG Building Services e-logbook</title>
 <link rel="icon" href="fsg-logo.jpg">
 <style>
-:root{--red:#e8432e;--ink:#2f3337;--mut:#6b7178;--line:#e3e5e8;--bg:#f5f6f7;--g:#1f8a4c;--a:#c98a00;--r:#c62f1d;--b:#2d6cdf}
+:root{--red:#e8432e;--ink:#2f3337;--mut:#6b7178;--line:#e3e5e8;--bg:#f5f6f7;--g:#1f8a4c;--a:#c98a00;--r:#c62f1d;--b:#2d6cdf;--m:#7b4fc9}
 *{box-sizing:border-box}body{margin:0;font:15px/1.45 -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--ink);background:var(--bg)}
 header{background:#fff;border-bottom:4px solid var(--red)}
 .wrap{max-width:1080px;margin:0 auto;padding:16px}
@@ -22,7 +22,7 @@ button.p{background:var(--red);border-color:var(--red);color:#fff}button:disable
 .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px}
 .card h3{margin:0 0 6px;font-size:15px}.card .big{font-size:13px;color:var(--mut)}
 .pill{display:inline-block;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;color:#fff}
-.G{background:var(--g)}.A{background:var(--a)}.R{background:var(--r)}.B{background:var(--b)}.N{background:#9aa0a6}
+.G{background:var(--g)}.A{background:var(--a)}.R{background:var(--r)}.B{background:var(--b)}.M{background:var(--m)}.N{background:#9aa0a6}
 .bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:8px}.bar i{display:block;height:100%;background:var(--g)}
 section{margin:22px 0}section>h2{font-size:17px;margin:0 0 10px;padding-left:10px;border-left:4px solid var(--red)}
 table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:14px}
@@ -123,25 +123,28 @@ function tasks(){ // one row per task type
   for(const i of D.items){const k=i.key;(m[k]=m[k]||{key:k,label:i.label,section:i.section,all:[]}).all.push(i)}
   return Object.values(m).map(t=>{
     const done=t.all.filter(i=>i.state==="done").sort((a,b)=>Date.parse(b.doneAt||b.due)-Date.parse(a.doneAt||a.due));
-    const out=t.all.filter(i=>i.state==="outstanding").sort((a,b)=>Date.parse(a.due)-Date.parse(b.due));
+    const mEnd=d=>{const x=new Date(d);return new Date(x.getFullYear(),x.getMonth()+1,1).getTime()};
+    const outAll=t.all.filter(i=>i.state==="outstanding").sort((a,b)=>Date.parse(a.due)-Date.parse(b.due));
+    const wk=/weekly|fortnightly/i.test(t.label);const out=wk?outAll:outAll.filter(i=>now>=mEnd(i.due)), dueM=wk?[]:outAll.filter(i=>now<mEnd(i.due));
     const nxt=t.all.filter(i=>i.state==="scheduled").sort((a,b)=>Date.parse(a.due)-Date.parse(b.due));
-    const pastDue=t.all.filter(i=>Date.parse(i.due)<=now&&Date.parse(i.due)>now-365*DAY);const pct=pastDue.length?Math.round(100*pastDue.filter(i=>i.state==="done").length/pastDue.length):100;
+    const pastDue=t.all.filter(i=>Date.parse(i.due)<=now&&Date.parse(i.due)>now-365*DAY&&!dueM.includes(i));const pct=pastDue.length?Math.round(100*pastDue.filter(i=>i.state==="done").length/pastDue.length):100;
     let st="G",txt="Up to date";
-    if(out.length){const age=(now-Date.parse(out[0].due))/DAY;st=age>14?"R":"A";txt=out.length+" overdue"}
+    if(out.length){st=wk&&(now-Date.parse(out[0].due))/DAY<=14?"A":"R";txt=out.length+" overdue"}
+    else if(dueM.length){st="M";txt="Due this month"}
     else if(!done.length){st="B";txt="Scheduled"}
     done.forEach(i=>{i.doneAt=i.doneAt||i.due});
-    return {...t,last:done[0],next:nxt[0],out,st,txt,pct}
+    const pend=out[0]||dueM[0]||null;return {...t,last:done[0],next:nxt[0],out,dueM,pend,st,txt,pct}
   }).sort((a,b)=>ORDER.indexOf(a.section)-ORDER.indexOf(b.section)||a.label.localeCompare(b.label))
 }
 function docsList(){return [...D.docs].filter(d=>/certificate|report|inspection|test|log|survey|analysis/i.test(d.name)&&!/docket|job card|callslip|invoice|quote|purchase/i.test(d.name)).sort((a,b)=>Date.parse(b.date)-Date.parse(a.date))}
 function render(){
   const s=D.site,T=tasks();
   const panels=(s.panels||[]).map(p=>p.name);
-  const due=T.reduce((a,t)=>a+t.pct,0)/T.length,nR=T.filter(t=>t.st==="R").length,nA=T.filter(t=>t.st==="A").length;
+  const due=T.reduce((a,t)=>a+t.pct,0)/T.length,nR=T.filter(t=>t.st==="R").length,nA=T.filter(t=>t.st==="A").length,nM=T.filter(t=>t.st==="M").length;
   const rc=due>=95?"var(--g)":due>=85?"var(--a)":"var(--r)";
   let h=`<div class="hero"><div class="ring" style="background:conic-gradient(${rc} ${due*3.6}deg,#eceef0 0)"><div style="background:#fff;width:96px;height:96px;border-radius:50%;display:grid;place-items:center"><div>${Math.round(due)}%<small>ON TIME</small></div></div></div>
    <div><div class="sm mut">${esc(s.client)}</div><h2>${esc(s.name)}</h2><div class="mut">${esc(s.address)}</div>
-   <div class="chips"><span class="chip"><span class="pill ${nR?"R":nA?"A":"G"}">${nR?nR+" overdue":nA?nA+" attention":"All compliant"}</span></span><span class="chip">${T.length} maintained items</span><span class="chip">Updated ${ft(D.refreshed_at)}</span></div>
+   <div class="chips"><span class="chip"><span class="pill ${nR?"R":nA?"A":nM?"M":"G"}">${nR?nR+" overdue":nA?nA+" attention":nM?nM+" due this month":"All compliant"}</span></span><span class="chip">${T.length} maintained items</span><span class="chip">Updated ${ft(D.refreshed_at)}</span></div>
    <div class="tabs">${["all",...panels].map(p=>`<button class="tab ${PANEL===p?"on":""}" data-p="${esc(p)}">${p==="all"?"Whole site":esc(p)}</button>`).join("")}</div></div></div>`;
   h+=`<div class="site"><div><h2>${esc(s.name)}</h2><div class="s">${esc(s.address)}</div><div class="s sm">Client: ${esc(s.client)}</div>
    <div class="tabs">${["all",...panels].map(p=>`<button class="tab ${PANEL===p?"on":""}" data-p="${esc(p)}">${p==="all"?"Whole site":esc(p)}</button>`).join("")}</div></div>
@@ -149,9 +152,9 @@ function render(){
   if((D.faults||[]).some(f=>f.status!=="closed"))h+=`<div class="card" style="border-left:5px solid var(--r);margin-bottom:12px"><b>${(D.faults||[]).filter(f=>f.status!=="closed").length} open fire alarm fault(s) or disablement(s)</b> <span class="sm mut">  See "Open faults and disablements" below.</span></div>`;
   // Summary by section
   const secs=ORDER.filter(x=>T.some(t=>t.section===x));
-  h+=`<section><h2>Compliance summary</h2><div class="grid">`+secs.map(x=>{const ts=T.filter(t=>t.section===x);const w=ts.some(t=>t.st==="R")?"R":ts.some(t=>t.st==="A")?"A":"G";
+  h+=`<section><h2>Compliance summary</h2><div class="grid">`+secs.map(x=>{const ts=T.filter(t=>t.section===x);const w=ts.some(t=>t.st==="R")?"R":ts.some(t=>t.st==="A")?"A":ts.some(t=>t.st==="M")?"M":"G";
     const pd=ts.reduce((a,t)=>a+t.pct,0)/ts.length;
-    return `<div class="card"><h3>${esc(x)}</h3><span class="pill ${w}">${w==="G"?"Compliant":w==="A"?"Attention":"Overdue"}</span> <span class="big">${ts.length} task${ts.length>1?"s":""}</span><div class="bar"><i style="width:${pd}%;background:${w==="G"?"var(--g)":w==="A"?"var(--a)":"var(--r)"}"></i></div><div class="sm mut" style="margin-top:4px">${Math.round(pd)}% of due visits completed (12 months)</div></div>`}).join("")+`</div></section>`;
+    return `<div class="card"><h3>${esc(x)}</h3><span class="pill ${w}">${w==="G"?"Compliant":w==="A"?"Attention":w==="M"?"Due this month":"Overdue"}</span> <span class="big">${ts.length} task${ts.length>1?"s":""}</span><div class="bar"><i style="width:${pd}%;background:${w==="G"?"var(--g)":w==="A"?"var(--a)":w==="M"?"var(--m)":"var(--r)"}"></i></div><div class="sm mut" style="margin-top:4px">${Math.round(pd)}% of due visits completed (12 months)</div></div>`}).join("")+`</div></section>`;
   // Fire alarm panels
   const showP=PANEL==="all"?s.panels:s.panels.filter(p=>p.name===PANEL);
   const fw=T.find(x=>x.key==="fa_weekly");
@@ -180,9 +183,9 @@ function render(){
       FC.map(f=>`<div class="card" style="border-left:5px solid var(--g)"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><h3>${esc(f.title)}</h3><span class="pill G">Resolved ${fd(f.closed_at)}</span></div><div class="sm">${esc(f.explanation||f.detail||"")}</div></div>`).join("")+`</div></section>`;
   }
   // Register
-  h+=`<section><h2>Planned maintenance register</h2><table><thead><tr><th>Task</th><th>Last completed</th><th class="hide-s">By</th><th>Next due</th><th>Status</th></tr></thead><tbody>`;
+  h+=`<section><h2>Planned maintenance register</h2><p class="sm mut" style="margin:-4px 0 8px"><span class="pill M">Due this month</span> scheduled for this month and not yet done.  <span class="pill R">Overdue</span> the month it was due has passed.</p><table><thead><tr><th>Task</th><th>Last completed</th><th class="hide-s">By</th><th>Next due</th><th>Status</th></tr></thead><tbody>`;
   let cur="";for(const t of T){if(t.section!==cur){cur=t.section;h+=`<tr class="sec"><td colspan="5">${esc(cur)}</td></tr>`}
-    h+=`<tr><td>${esc(t.label)}</td><td>${fd(t.last?.doneAt)}</td><td class="hide-s">${esc(t.last?.by||"–")}</td><td>${t.out.length?`<b style="color:var(--r)">${fd(t.out[0].due)}</b>`:fd(t.next?.due)}</td><td><span class="pill ${t.st}">${t.txt}</span></td></tr>`}
+    h+=`<tr><td>${esc(t.label)}</td><td>${fd(t.last?.doneAt)}</td><td class="hide-s">${esc(t.last?.by||"–")}</td><td>${t.pend?`<b style="color:var(--${t.out.length?"r":"m"})">${fd(t.pend.due)}</b>${t.pend.booked?`<div class="sm mut">Booked ${fd(t.pend.booked)}</div>`:""}`:fd(t.next?.due)}</td><td><span class="pill ${t.st}">${t.txt}</span></td></tr>`}
   h+=`</tbody></table></section>`;
   // Weekly FA log
   const tl=D.tests.filter(t=>PANEL==="all"||t.panel===PANEL);
@@ -208,7 +211,7 @@ let LOGO=null;
 async function logo(){if(LOGO)return LOGO;const r=await fetch("fsg-logo.jpg");const bl=await r.blob();LOGO=await new Promise(res=>{const f=new FileReader();f.onload=()=>res(f.result);f.readAsDataURL(bl)});return LOGO}
 async function makePdf(out){
   const {jsPDF}=window.jspdf;const doc=new jsPDF({unit:"mm",format:"a4"});const s=D.site,T=tasks();const RED=[232,67,46],INK=[47,51,55],MUT=[107,113,120];
-  const SC={G:[31,138,76],A:[201,138,0],R:[198,47,29],B:[45,108,223]};
+  const SC={G:[31,138,76],A:[201,138,0],R:[198,47,29],B:[45,108,223],M:[123,79,201]};
   const lg=await logo();
   const head=()=>{doc.addImage(lg,"JPEG",14,9,26,13);doc.setFont("helvetica","bold");doc.setFontSize(14);doc.setTextColor(...INK);doc.text("FSG Building Services e-logbook",46,15);
     doc.setFont("helvetica","normal");doc.setFontSize(9);doc.setTextColor(...MUT);doc.text(s.address,46,20.5);doc.setDrawColor(...RED);doc.setLineWidth(1);doc.line(14,25,196,25)};
@@ -222,7 +225,7 @@ async function makePdf(out){
   let y=h2("Compliance summary",58);
   const secs=ORDER.filter(x=>T.some(t=>t.section===x));
   doc.autoTable({...opts,startY:y,head:[["Area","Tasks","Due visits completed (12 months)","Status"]],columns:[{dataKey:"a"},{dataKey:"n"},{dataKey:"p"},{dataKey:"st"}],
-    body:secs.map(x=>{const ts=T.filter(t=>t.section===x);const w=ts.some(t=>t.st==="R")?"R":ts.some(t=>t.st==="A")?"A":"G";return {a:x,n:ts.length,p:Math.round(ts.reduce((a,t)=>a+t.pct,0)/ts.length)+"%",st:w==="G"?"Compliant":w==="A"?"Attention":"Overdue",_st:w}}),...pill()});
+    body:secs.map(x=>{const ts=T.filter(t=>t.section===x);const w=ts.some(t=>t.st==="R")?"R":ts.some(t=>t.st==="A")?"A":ts.some(t=>t.st==="M")?"M":"G";return {a:x,n:ts.length,p:Math.round(ts.reduce((a,t)=>a+t.pct,0)/ts.length)+"%",st:w==="G"?"Compliant":w==="A"?"Attention":w==="M"?"Due this month":"Overdue",_st:w}}),...pill()});
   y=h2("Fire alarm panels",doc.lastAutoTable.finalY+10);
   doc.autoTable({...opts,startY:y,head:[["Panel","Reference","Last weekly test","Call point","Result"]],body:s.panels.map(p=>{const l=D.tests.find(t=>t.panel===p.name);const fw=T.find(x=>x.key==="fa_weekly");if(!l&&fw?.last)return [p.name,p.ref||"",fd(fw.last.doneAt),"FSG weekly test visit",fw.last.by||"FSG"];return [p.name,p.ref||"",l?ft(l.test_at):"–",l?l.cp_location:"–",l?l.result+" ("+l.tested_by+")":"No test logged"]})});
   doc.setFontSize(8);doc.setTextColor(...MUT);doc.text(`${s.monitoring?"Remote monitoring: "+s.monitoring.type+".  ":""}Panel status reflects the latest logged test, not a live feed.`,14,doc.lastAutoTable.finalY+5);
@@ -230,7 +233,7 @@ async function makePdf(out){
   if(FO.length){y=h2("Open faults and disablements",yy);doc.autoTable({...opts,startY:y,head:[["Fault","Since","Detail","Explanation and action"]],columnStyles:{0:{fontStyle:"bold",textColor:[198,47,29],cellWidth:38},1:{cellWidth:20}},body:FO.map(f=>[f.title,fd(f.raised_at),f.detail||"",(f.explanation||"Awaiting explanation from FSG.")+(f.action?"  Action: "+f.action:"")])});yy=doc.lastAutoTable.finalY+10}
   y=h2("Planned maintenance register",yy);
   const rows=[];let cur="";for(const t of T){if(t.section!==cur){cur=t.section;rows.push({t:{content:cur,colSpan:5,styles:{fillColor:[240,241,243],fontStyle:"bold"}}})}
-    rows.push({t:t.label,l:fd(t.last?.doneAt),b:t.last?.by||"–",n:t.out.length?fd(t.out[0].due):fd(t.next?.due),st:t.txt,_st:t.st})}
+    rows.push({t:t.label,l:fd(t.last?.doneAt),b:t.last?.by||"–",n:t.pend?fd(t.pend.due)+(t.pend.booked?" (booked "+fd(t.pend.booked)+")":""):fd(t.next?.due),st:t.txt,_st:t.st})}
   doc.autoTable({...opts,startY:y,columns:[{header:"Task",dataKey:"t"},{header:"Last completed",dataKey:"l"},{header:"By",dataKey:"b"},{header:"Next due",dataKey:"n"},{header:"Status",dataKey:"st"}],body:rows,...pill()});
   y=h2("Weekly fire alarm test log",doc.lastAutoTable.finalY+10);
   doc.autoTable({...opts,startY:y,head:[["Date","Panel","Call point tested","Result","Tested by"]],body:D.tests.length?D.tests.slice(0,26).map(t=>[ft(t.test_at),t.panel,t.cp_location||t.cp_ref||"",t.result,t.tested_by]):D.items.filter(i=>i.key==="fa_weekly"&&i.state==="done").sort((a,b)=>Date.parse(b.doneAt||b.due)-Date.parse(a.doneAt||a.due)).slice(0,26).map(i=>[fd(i.doneAt||i.due),s.panels[0]?.name||"Panel","FSG weekly test visit","Completed",i.by||"FSG"])});
