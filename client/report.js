@@ -1,0 +1,98 @@
+// Shared FSG monthly contract report renderer (portal + review) and PDF builder.  Sell values only.
+const API="https://chftzzfssiaacvyvvucu.supabase.co/functions/v1/client-portal";
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fd=d=>d?new Date(d+(d.length===10?"T12:00:00":"")).toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"}):"–";
+const fdm=d=>d?new Date(d+"T12:00:00").toLocaleDateString("en-GB",{day:"2-digit",month:"short"}):"–";
+const gbp=v=>"£"+Number(v||0).toLocaleString("en-GB",{minimumFractionDigits:2,maximumFractionDigits:2});
+const pct=(a,b)=>b?Math.round(100*a/b):100;
+const call=async b=>{const r=await fetch(API,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(b)});const j=await r.json().catch(()=>({}));if(!r.ok){const e=new Error(j.error||"Something went wrong.");e.status=r.status;throw e}return j};
+const TODAY=new Date().toISOString().slice(0,10);const cont=s=>/Continuous/.test(s.freq||"");
+const pendTxt=b=>!b?"In progress":b<TODAY?"Awaiting sign-off":"Booked "+fdm(b);
+function svcPill(s){if(cont(s))return'<span class="pill G">Active</span>';if(s.status==="Up to date")return'<span class="pill G">Up to date</span>';if(s.status==="Scheduled")return'<span class="pill B">Scheduled</span>';const t=pendTxt(s.booked);return `<span class="pill ${t.startsWith("Booked")?"B":"A"}">${t}</span>`}
+function visitPill(v){if(v.done)return `<span class="pill G">Completed${v.done_date?" "+fdm(v.done_date):""}</span>`;const t=pendTxt(v.booked);return `<span class="pill ${t.startsWith("Booked")?"B":"A"}">${t}</span>`}
+const lastTxt=s=>cont(s)?"Monitored 24/7":fd(s.last_done);const nextTxt=s=>cont(s)?"Continuous":s.next_due?fd(s.next_due):/Annual|6-monthly/.test(s.freq||"")?"Next contract year":"–";
+const svcLabel=s=>{const [a,b]=String(s).split(";");return b?`<b>${esc(a.trim())}</b><div class="sm mut">${esc(b.trim())}</div>`:`<b>${esc(a)}</b>`};
+let charts=[];
+function renderReport(el,d,opts={}){
+  charts.forEach(c=>c.destroy());charts=[];const S=d.summary;const sites=[...new Set(d.services.map(s=>s.site))];
+  const statusCount={up:d.services.filter(s=>s.status==="Up to date"||cont(s)).length,prog:d.services.filter(s=>s.status==="Outstanding"&&!cont(s)).length,sch:d.services.filter(s=>s.status==="Scheduled").length};
+  el.innerHTML=`
+  ${opts.banner||""}
+  <div class="hero"><div class="k">Monthly facilities management report</div><h1>${esc(d.account.name)} · ${esc(d.period_label)}</h1>
+   <p>${d.sites.map(s=>esc(s.label)).join("  ·  ")}</p><p class="sm" style="margin-top:10px">Prepared by Facility Services Group Limited  ·  generated ${fd(d.generated_at.slice(0,10))}</p></div>
+  ${d.commentary?`<div class="card"><h2>Account manager&rsquo;s summary</h2><div style="white-space:pre-wrap">${esc(d.commentary)}</div></div>`:""}
+  <div class="kpis">
+   <div class="kpi"><div class="ring"><canvas id="r1"></canvas><div><div class="l">Planned visits this month</div><div class="v">${pct(S.ppm_done,S.ppm_due)}%</div><div class="s">${S.ppm_done} of ${S.ppm_due} completed</div></div></div></div>
+   <div class="kpi"><div class="ring"><canvas id="r2"></canvas><div><div class="l">Rolling 12 months</div><div class="v">${pct(S.ppm_12m_done,S.ppm_12m_due)}%</div><div class="s">${S.ppm_12m_done} of ${S.ppm_12m_due} visits</div></div></div></div>
+   <div class="kpi"><div class="l">Services maintained</div><div class="v">${S.services}</div><div class="s">across ${sites.length} sites · ${S.assets} assets and systems</div></div>
+   <div class="kpi"><div class="l">Reactive requests</div><div class="v">${S.reactive_raised}</div><div class="s">raised this month · ${S.reactive_open} open in total</div></div>
+   <div class="kpi"><div class="l">Quotes awaiting approval</div><div class="v">${S.quotes_awaiting}</div><div class="s">${gbp(S.quotes_awaiting_value)} + VAT</div></div>
+   <div class="kpi"><div class="l">Invoiced this month</div><div class="v">${gbp(S.invoiced_month)}</div><div class="s">${gbp(S.invoiced_contract_year)} contract year to date (ex VAT)</div></div>
+  </div>
+  <div class="grid2">
+   <div class="card"><h2>Planned maintenance completion, last 12 months</h2><div style="position:relative;height:260px"><canvas id="c1"></canvas></div></div>
+   <div class="card"><h2>Service status at month end</h2><div style="position:relative;height:260px"><canvas id="c2"></canvas></div>
+    <div class="sm mut" style="margin-top:8px">${statusCount.up} up to date · ${statusCount.prog} in progress or booked · ${statusCount.sch} scheduled</div></div>
+  </div>
+  ${d.highlights?.length?`<div class="card"><h2>Highlights</h2><ul style="margin:0;padding-left:20px">${d.highlights.map(h=>`<li>${esc(h)}</li>`).join("")}</ul></div>`:""}
+  <div class="card"><h2>Services and compliance register</h2><div class="sm mut" style="margin:-6px 0 10px">Every service under contract, with its last completed visit and next planned date.</div>
+   <div style="overflow-x:auto"><table><tr><th>Service</th><th class="hide-s">Frequency</th><th>Last completed</th><th>Next planned</th><th>Status</th></tr>
+   ${sites.map(st=>`<tr class="sec"><td colspan="5">${esc(st)}</td></tr>`+d.services.filter(s=>s.site===st).map(s=>`<tr><td>${svcLabel(s.service)}</td><td class="hide-s">${esc(s.freq||"–")}</td><td class="nowrap">${lastTxt(s)}</td><td class="nowrap">${nextTxt(s)}</td><td>${svcPill(s)}</td></tr>`).join("")).join("")}</table></div></div>
+  <div class="card"><h2>Visits in ${esc(d.period_label)}</h2><div style="overflow-x:auto"><table><tr><th>Planned</th><th>Site</th><th>Service</th><th class="hide-s">Engineer(s)</th><th>Status</th></tr>
+   ${d.month_visits.map(v=>`<tr><td class="nowrap">${fdm(v.due)}</td><td>${esc(v.site)}</td><td>${svcLabel(v.service)}</td><td class="hide-s sm">${esc((v.engineers||[]).join(", ")||"–")}</td><td>${visitPill(v)}</td></tr>`).join("")}</table></div></div>
+  <div class="card"><h2>Coming up</h2><div class="sm mut" style="margin:-6px 0 10px">Planned visits over the next two months.</div><div style="overflow-x:auto"><table><tr><th>Planned</th><th>Site</th><th>Service</th></tr>
+   ${d.upcoming.filter(u=>!/1W Test/.test(u.service)).slice(0,40).map(v=>`<tr><td class="nowrap">${fdm(v.due)}</td><td>${esc(v.site)}</td><td>${svcLabel(v.service)}</td></tr>`).join("")||'<tr><td colspan="3" class="mut">Nothing scheduled</td></tr>'}
+   <tr><td colspan="3" class="sm mut">Weekly fire alarm tests continue every week at each site.</td></tr></table></div></div>
+  <div class="card"><h2>Reactive works</h2><div style="overflow-x:auto"><table><tr><th>Logged</th><th>Site</th><th>Request</th><th>Status</th></tr>
+   ${d.reactive.slice(0,15).map(x=>`<tr><td class="nowrap">${fd(x.logged)}</td><td>${esc(x.site)}</td><td>${esc(x.desc)}</td><td>${x.status==="Complete"?'<span class="pill G">Complete</span>':`<span class="pill A">${esc(x.status)}</span>`}</td></tr>`).join("")||'<tr><td colspan="4" class="mut">No reactive requests</td></tr>'}</table></div></div>
+  <div class="card"><h2>Recommendations and quotes awaiting your approval</h2>
+   <div style="overflow-x:auto"><table><tr><th>Quote</th><th>Site</th><th>Scope</th><th class="r">Value (ex VAT)</th></tr>
+   ${d.recommendations.map(q=>`<tr><td class="nowrap"><b>${esc(q.no)}</b><div class="sm mut">${fd(q.date)}</div></td><td>${esc(q.site)}</td><td class="sm">${esc(q.title)}${q.expiry?`<div class="mut">Valid until ${fd(q.expiry)}</div>`:""}</td><td class="r nowrap">${gbp(q.value)}</td></tr>`).join("")||'<tr><td colspan="4" class="mut">No quotes awaiting approval</td></tr>'}</table></div>
+   <p class="quiet" style="margin-top:12px">We are always happy to quote for additional assets, systems or services at your sites.  Just ask through the Suggestions tab or speak to your account manager.</p></div>
+  <div class="card"><h2>Assets and systems under service</h2><div style="overflow-x:auto"><table><tr><th>Site</th><th>Asset or system</th><th class="hide-s">Type</th><th class="hide-s">Condition</th></tr>
+   ${d.assets.sort((a,b)=>a.site.localeCompare(b.site)||a.desc.localeCompare(b.desc)).map(a=>`<tr><td>${esc(a.site)}</td><td><b>${esc(a.desc)}</b>${a.qty>1?` <span class="mut">× ${a.qty}</span>`:""}${a.location?`<div class="sm mut">${esc(a.location)}</div>`:""}</td><td class="hide-s">${esc(a.class||"–")}</td><td class="hide-s">${esc(a.condition||"Serviced to schedule")}</td></tr>`).join("")}</table></div></div>
+  <div class="card"><h2>Invoices</h2><div class="sm mut" style="margin:-6px 0 10px">Invoiced values excluding VAT.</div><div style="overflow-x:auto"><table><tr><th>Invoice</th><th>Date</th><th>Site</th><th class="hide-s">Description</th><th class="r">Net</th></tr>
+   ${d.invoices.slice(0,15).map(i=>`<tr><td>${esc(i.no)}</td><td class="nowrap">${fd(i.date)}</td><td>${esc(i.site)}</td><td class="hide-s sm">${esc(i.desc)}</td><td class="r nowrap">${gbp(i.net)}</td></tr>`).join("")}</table></div></div>`;
+  const ring=(id,v,col)=>charts.push(new Chart(document.getElementById(id),{type:"doughnut",data:{datasets:[{data:[v,100-v],backgroundColor:[col,"#e9ebee"],borderWidth:0}]},options:{cutout:"72%",plugins:{legend:{display:false},tooltip:{enabled:false}},animation:false}}));
+  ring("r1",pct(S.ppm_done,S.ppm_due),"#e8432e");ring("r2",pct(S.ppm_12m_done,S.ppm_12m_due),"#1f8a4c");
+  const lab=d.trend.map(t=>new Date(t.month+"-15").toLocaleDateString("en-GB",{month:"short"}));
+  charts.push(new Chart(document.getElementById("c1"),{type:"bar",data:{labels:lab,datasets:[{label:"Completed",data:d.trend.map(t=>t.done),backgroundColor:"#2f3337",borderRadius:4},{label:"Planned",data:d.trend.map(t=>t.due-t.done),backgroundColor:"#f3b3a8",borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{position:"bottom"}},scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true}}}}));
+  charts.push(new Chart(document.getElementById("c2"),{type:"doughnut",data:{labels:["Up to date","In progress or booked","Scheduled"],datasets:[{data:[statusCount.up,statusCount.prog,statusCount.sch],backgroundColor:["#1f8a4c","#2d6cdf","#9aa0a6"],borderWidth:0}]},options:{maintainAspectRatio:false,animation:false,cutout:"62%",plugins:{legend:{position:"bottom"}}}}));
+}
+async function reportPdf(d){
+  const {jsPDF}=window.jspdf;const doc=new jsPDF({unit:"mm",format:"a4"});const RED=[232,67,46],INK=[47,51,55],MUT=[107,113,120];const S=d.summary;
+  const logo=await new Promise(r=>{const i=new Image();i.crossOrigin="anonymous";i.onload=()=>{const c=document.createElement("canvas");c.width=i.width;c.height=i.height;c.getContext("2d").drawImage(i,0,0);r(c.toDataURL("image/jpeg",.92))};i.onerror=()=>r(null);i.src=(location.pathname.includes("/review/")?"../../":"../")+"fsg-logo.jpg"});
+  const head=()=>{doc.setFillColor(...RED);doc.rect(0,0,210,3,"F");if(logo)doc.addImage(logo,"JPEG",14,7,22,11);doc.setFont("helvetica","bold");doc.setFontSize(10);doc.setTextColor(...INK);doc.text(`${d.account.name}  ·  ${d.period_label}`,196,13,{align:"right"});doc.setFont("helvetica","normal");doc.setFontSize(8);doc.setTextColor(...MUT);doc.text("Monthly facilities management report",196,17.5,{align:"right"})};
+  const foot=()=>{const n=doc.getNumberOfPages();for(let i=1;i<=n;i++){doc.setPage(i);doc.setFontSize(7.5);doc.setTextColor(...MUT);doc.text("Facility Services Group Limited  ·  01792 898040  ·  info@fsgfm.co.uk",14,289);doc.text(`Page ${i} of ${n}`,196,289,{align:"right"})}};
+  const h2=(t,y)=>{doc.setFillColor(...RED);doc.rect(14,y-4,1.6,5.5,"F");doc.setFont("helvetica","bold");doc.setFontSize(12.5);doc.setTextColor(...INK);doc.text(t,18,y);return y+4};
+  const T={theme:"grid",rowPageBreak:"avoid",styles:{fontSize:8.2,cellPadding:2,lineColor:[227,229,232],textColor:INK},headStyles:{fillColor:[47,51,55],textColor:255,fontStyle:"bold"},alternateRowStyles:{fillColor:[250,251,252]},margin:{left:14,right:14,top:31},didDrawPage:head};
+  // cover
+  doc.setFillColor(47,51,55);doc.rect(0,0,210,297,"F");doc.setFillColor(...RED);doc.rect(0,0,210,6,"F");doc.circle(200,40,55,"F");doc.setFillColor(47,51,55);doc.circle(200,40,47,"F");
+  if(logo){doc.setFillColor(255,255,255);doc.roundedRect(14,22,58,30,3,3,"F");doc.addImage(logo,"JPEG",18,26,50,22)}
+  doc.setTextColor(255,255,255);doc.setFont("helvetica","normal");doc.setFontSize(11);doc.text("MONTHLY FACILITIES MANAGEMENT REPORT",14,120);
+  doc.setFont("helvetica","bold");doc.setFontSize(30);doc.text(d.account.name,14,136);doc.setFontSize(22);doc.setTextColor(...RED);doc.text(d.period_label,14,150);
+  doc.setTextColor(220,222,225);doc.setFont("helvetica","normal");doc.setFontSize(10.5);doc.text(doc.splitTextToSize(d.sites.map(s=>s.label).join("\n"),170),14,166);
+  doc.setFontSize(9);doc.text(`Prepared by Facility Services Group Limited  ·  ${fd(d.generated_at.slice(0,10))}`,14,270);
+  // summary page
+  doc.addPage();head();let y=h2("At a glance",32);
+  const k=[["Planned visits this month",`${pct(S.ppm_done,S.ppm_due)}%`,`${S.ppm_done} of ${S.ppm_due} completed`],["Rolling 12 months",`${pct(S.ppm_12m_done,S.ppm_12m_due)}%`,`${S.ppm_12m_done} of ${S.ppm_12m_due} visits`],["Services maintained",String(S.services),`${S.assets} assets and systems`],["Reactive requests",String(S.reactive_raised),`raised this month, ${S.reactive_open} open`],["Quotes awaiting approval",String(S.quotes_awaiting),gbp(S.quotes_awaiting_value)+" + VAT"],["Invoiced this month",gbp(S.invoiced_month),gbp(S.invoiced_contract_year)+" contract year"]];
+  k.forEach((x,i)=>{const cx=14+(i%3)*61,cy=y+Math.floor(i/3)*27;doc.setDrawColor(227,229,232);doc.setFillColor(255,255,255);doc.roundedRect(cx,cy,58,23,2,2,"FD");doc.setFontSize(7);doc.setTextColor(...MUT);doc.text(x[0].toUpperCase(),cx+4,cy+6);doc.setFont("helvetica","bold");doc.setFontSize(15);doc.setTextColor(...INK);doc.text(x[1],cx+4,cy+14);doc.setFont("helvetica","normal");doc.setFontSize(7.5);doc.setTextColor(...MUT);doc.text(x[2],cx+4,cy+19.5)});
+  y+=60;
+  if(d.commentary){y=h2("Account manager's summary",y);doc.setFontSize(9.5);doc.setTextColor(...INK);const L=doc.splitTextToSize(d.commentary,180);doc.text(L,14,y+2);y+=L.length*4.4+8}
+  const c1=document.getElementById("c1"),c2=document.getElementById("c2");
+  if(c1&&c2){y=h2("Performance",y);const h1=112*c1.height/c1.width,w2=Math.min(64,62*c2.width/c2.height),h2c=w2*c2.height/c2.width;doc.addImage(c1.toDataURL("image/png"),"PNG",14,y,112,h1);doc.addImage(c2.toDataURL("image/png"),"PNG",164-w2/2,y,w2,h2c);y+=Math.max(h1,h2c)+6}
+  if(d.highlights?.length){y=h2("Highlights",y);doc.setFontSize(9.5);doc.setTextColor(...INK);for(const h of d.highlights){const L=doc.splitTextToSize("•  "+h,180);doc.text(L,14,y+2);y+=L.length*4.4+1.5}}
+  const st=s=>cont(s)?"Active":s.status==="Up to date"?"Up to date":s.status==="Scheduled"?"Scheduled":pendTxt(s.booked);
+  const COL={"Up to date":[31,138,76],"Active":[31,138,76],"Scheduled":[110,116,122],"Awaiting sign-off":[201,138,0],"In progress":[201,138,0]};
+  doc.addPage();doc.autoTable({...T,startY:30,head:[["Site","Service","Frequency","Last completed","Next planned","Status"]],body:d.services.map(s=>[s.site,s.service,s.freq||"–",lastTxt(s),nextTxt(s),st(s)]),columnStyles:{0:{cellWidth:24},1:{cellWidth:66}},didParseCell:x=>{if(x.section==="body"&&x.column.index===5){const v=x.cell.raw;x.cell.styles.textColor=COL[v]||[45,108,223];x.cell.styles.fontStyle="bold"}},didDrawPage:()=>{head();h2("Services and compliance register",30-6+1)}});
+  doc.addPage();doc.autoTable({...T,startY:30,head:[["Planned","Site","Service","Engineer(s)","Status"]],body:d.month_visits.map(v=>[fdm(v.due),v.site,v.service,(v.engineers||[]).join(", ")||"–",v.done?"Completed "+fdm(v.done_date):pendTxt(v.booked)]),didDrawPage:()=>{head();h2("Visits in "+d.period_label,25)}});
+  let yy=doc.lastAutoTable.finalY+12;if(yy>240){doc.addPage();yy=32}
+  h2("Recommendations and quotes awaiting your approval",yy);doc.autoTable({...T,startY:yy+4,head:[["Quote","Date","Site","Scope","Value (ex VAT)"]],body:d.recommendations.map(q=>[q.no,fd(q.date),q.site,q.title,gbp(q.value)]),columnStyles:{3:{cellWidth:86},4:{halign:"right"}}});
+  yy=doc.lastAutoTable.finalY+6;doc.setFontSize(9);doc.setTextColor(...MUT);doc.text(doc.splitTextToSize("We are always happy to quote for additional assets, systems or services at your sites.  Just ask your account manager or use the Suggestions tab in your client portal.",182),14,yy+3);
+  doc.addPage();doc.autoTable({...T,startY:30,head:[["Site","Asset or system","Type","Condition"]],body:d.assets.map(a=>[a.site,a.desc+(a.qty>1?" × "+a.qty:""),a.class||"–",a.condition||"Serviced to schedule"]),didDrawPage:()=>{head();h2("Assets and systems under service",25)}});
+  yy=doc.lastAutoTable.finalY+12;if(yy>230){doc.addPage();yy=32}
+  h2("Reactive works",yy);doc.autoTable({...T,startY:yy+4,head:[["Logged","Site","Request","Status"]],body:(d.reactive.length?d.reactive.slice(0,15):[]).map(x=>[fd(x.logged),x.site,x.desc,x.status])});
+  yy=doc.lastAutoTable.finalY+12;if(yy>230){doc.addPage();yy=32}
+  h2("Invoices (ex VAT)",yy);doc.autoTable({...T,startY:yy+4,head:[["Invoice","Date","Site","Description","Net"]],body:d.invoices.slice(0,15).map(i=>[i.no,fd(i.date),i.site,i.desc,gbp(i.net)]),columnStyles:{4:{halign:"right"}}});
+  foot();doc.save(`FSG ${d.account.name} - FM report - ${d.period_label}.pdf`);
+}

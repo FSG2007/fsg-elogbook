@@ -1,0 +1,57 @@
+<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
+<title>FSG Client Portal</title><link rel="icon" href="../fsg-logo.jpg"><link rel="stylesheet" href="app.css?v=1">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="report.js?v=1"></script></head><body>
+<header class="top"><div class="wrap"><img src="../fsg-logo.jpg" alt="FSG"><div class="brand"><b>Client Portal</b><span>Facility Services Group Limited</span></div><div class="sp"></div><div class="who" id="who"></div></div></header>
+<nav class="tabs hide" id="nav"><div class="wrap">
+ <button data-t="dash" class="on">Dashboard</button><button data-t="reports">Monthly reports</button><button data-t="files">File logbook</button><button data-t="assets">Assets and systems</button><button data-t="fb">Suggestions</button><button data-t="contact">Contact</button></div></nav>
+<main class="wrap" id="app"></main>
+<footer>Facility Services Group Limited · 01792 898040 · info@fsgfm.co.uk<br>Your information is private to your organisation.  Every sign-in is logged.</footer>
+<script>
+const $=s=>document.querySelector(s);let S=localStorage.getItem("fsg_cp")||"";let H=null,cur=null,ftr={site:"All",cat:"All",q:""};
+const qs=new URLSearchParams(location.search);
+function loginView(msg=""){$("#nav").classList.add("hide");$("#who").innerHTML="";
+ $("#app").innerHTML=`<div class="login"><div class="card"><h1>Sign in</h1><p class="mut sm">Your FSG client portal: monthly contract reports, certificates and service records.</p>
+ <label class="sm">Email</label><input id="em" type="email" autocomplete="username"><div style="height:10px"></div><label class="sm">Password</label><input id="pw" type="password" autocomplete="current-password">
+ <div class="err" id="err">${esc(msg)}</div><button class="pri" id="go" style="width:100%">Sign in</button>
+ <p class="sm mut" style="margin-top:14px">Forgotten your password, or need access for a colleague?  Contact your FSG account manager.</p></div></div>`;
+ const go=async()=>{$("#err").textContent="";try{const j=await call({op:"login",email:$("#em").value,password:$("#pw").value});S=j.session;localStorage.setItem("fsg_cp",S);load()}catch(e){$("#err").textContent=e.message}};
+ $("#go").onclick=go;$("#pw").onkeydown=e=>{if(e.key==="Enter")go()}}
+function setupView(t){$("#app").innerHTML=`<div class="login"><div class="card"><h1>Set your password</h1><p class="mut sm">Welcome to your FSG client portal.  Choose a password of at least 10 characters.</p>
+ <input id="p1" type="password" placeholder="New password" autocomplete="new-password"><div style="height:10px"></div><input id="p2" type="password" placeholder="Confirm password" autocomplete="new-password">
+ <div class="err" id="err"></div><button class="pri" id="go" style="width:100%">Save and continue</button></div></div>`;
+ $("#go").onclick=async()=>{if($("#p1").value!==$("#p2").value){$("#err").textContent="The passwords don't match.";return}try{await call({op:"setup",setup:t,password:$("#p1").value});history.replaceState(null,"",location.pathname);loginView("Password saved.  Please sign in.")}catch(e){$("#err").textContent=e.message}}}
+async function load(){try{H=await call({op:"home",session:S})}catch(e){if(e.status===401){localStorage.removeItem("fsg_cp");return loginView()}$("#app").innerHTML=`<div class="card">${esc(e.message)}</div>`;return}
+ $("#nav").classList.remove("hide");$("#who").innerHTML=`${esc(H.user.name||H.user.email)}<br><span>${esc(H.account.name)}</span> <button class="ghost" id="out" style="padding:5px 10px">Sign out</button>`;
+ $("#out").onclick=async()=>{await call({op:"logout",session:S}).catch(()=>{});localStorage.removeItem("fsg_cp");S="";loginView()};
+ cur=H.latest;tab("dash")}
+function tab(t){document.querySelectorAll("nav.tabs button").forEach(b=>b.classList.toggle("on",b.dataset.t===t));const A=$("#app");window.scrollTo(0,0);
+ if(t==="dash"){if(!cur){A.innerHTML=`<div class="card"><h2>Welcome</h2><p>Your first monthly report will appear here as soon as it is published.  In the meantime, your certificates and reports are in the File logbook.</p></div>`;return}
+  A.innerHTML=`<div class="row" style="justify-content:flex-end;margin-bottom:10px"><button class="pri" id="pdf">Download PDF</button></div><div id="rep"></div>`;renderReport($("#rep"),cur.data);$("#pdf").onclick=()=>reportPdf(cur.data)}
+ if(t==="reports"){A.innerHTML=`<div class="card"><h2>Monthly reports</h2>${H.reports.length?`<table><tr><th>Month</th><th>Published</th><th></th></tr>${H.reports.map(r=>`<tr><td><b>${esc(r.period_label)}</b></td><td>${(r.published_at?fd(r.published_at.slice(0,10)):"–")}</td><td class="r"><button class="sec" data-v="${r.id}">View</button></td></tr>`).join("")}</table>`:'<p class="mut">No reports published yet.</p>'}</div>`;
+  A.querySelectorAll("[data-v]").forEach(b=>b.onclick=async()=>{const j=await call({op:"report",session:S,id:b.dataset.v});cur=j.report;tab("dash")})}
+ if(t==="files")files();
+ if(t==="assets"){const d=(cur||H.latest)?.data;A.innerHTML=d?`<div class="card"><h2>Assets and systems under service</h2><p class="sm mut">${d.assets.length} assets and systems registered across your sites, maintained to the schedule in your contract.</p><table><tr><th>Site</th><th>Asset or system</th><th class="hide-s">Type</th><th>Condition</th></tr>${d.assets.map(a=>`<tr><td>${esc(a.site)}</td><td><b>${esc(a.desc)}</b>${a.qty>1?" × "+a.qty:""}</td><td class="hide-s">${esc(a.class||"–")}</td><td>${esc(a.condition||"Serviced to schedule")}</td></tr>`).join("")}</table>
+  <p class="quiet" style="margin-top:14px">Have equipment that isn&rsquo;t listed here?  We would be happy to survey it and quote for adding it to your maintenance schedule.  <a href="#" id="ask">Ask for a quote</a>.</p></div>`:'<div class="card mut">Available once your first report is published.</div>';const a=$("#ask");if(a)a.onclick=e=>{e.preventDefault();tab("fb");$("#k").value="quote_request"}}
+ if(t==="fb"){A.innerHTML=`<div class="grid2"><div class="card"><h2>Suggestions and requests</h2>
+  <p>This portal is built for you, so please tell us what would make it more useful.  You can ask for anything: changes to the layout, more data or charts, different reports, extra sites or assets, or a quote for additional services.</p>
+  <label class="sm">What is it about?</label><select id="k"><option value="suggestion">A suggestion</option><option value="change">A change to the layout or report</option><option value="more_data">More data or a new chart</option><option value="quote_request">A quote for additional services or assets</option><option value="question">A question</option><option value="praise">A compliment</option></select>
+  <div style="height:10px"></div><textarea id="msg" placeholder="Tell us what you&rsquo;d like…"></textarea><div class="err" id="err"></div><button class="pri" id="send">Send to FSG</button>
+  <p class="sm mut">Your account manager, ${esc(H.account.account_manager_name||"")}, will reply within one working day.</p></div>
+  <div class="card"><h2>Your previous messages</h2>${H.feedback.length?H.feedback.map(f=>`<div style="border-bottom:1px solid var(--line);padding:8px 0"><div class="sm mut">${fd(f.created_at.slice(0,10))}</div>${esc(f.message)}${f.response?`<div class="sm" style="margin-top:4px"><b>FSG:</b> ${esc(f.response)}</div>`:""}</div>`).join(""):'<p class="mut">None yet.</p>'}</div></div>`;
+  $("#send").onclick=async()=>{try{await call({op:"feedback",session:S,kind:$("#k").value,message:$("#msg").value});H=await call({op:"home",session:S});tab("fb");setTimeout(()=>{$("#err").style.color="var(--g)";$("#err").textContent="Thank you.  Your message has been sent to FSG."},50)}catch(e){$("#err").textContent=e.message}}}
+ if(t==="contact"){A.innerHTML=`<div class="card"><h2>Contact</h2><p><b>Account manager:</b> ${esc(H.account.account_manager_name||"")}<br><a href="mailto:${esc(H.account.account_manager_email)}">${esc(H.account.account_manager_email)}</a></p><p><b>Helpdesk:</b> 01792 898040 · <a href="mailto:helpdesk@fsgfm.co.uk">helpdesk@fsgfm.co.uk</a></p><p class="sm mut">For an emergency, please phone the helpdesk.</p></div>`}}
+function files(){const F=H.files;const sites=["All",...new Set(F.map(f=>f.site))],cats=["All",...new Set(F.map(f=>f.category))].sort();
+ const list=F.filter(f=>(ftr.site==="All"||f.site===ftr.site)&&(ftr.cat==="All"||f.category===ftr.cat)&&(!ftr.q||(f.title+" "+f.category).toLowerCase().includes(ftr.q.toLowerCase())));
+ $("#app").innerHTML=`<div class="card"><h2>File logbook</h2><p class="sm mut">Certificates, inspection reports and service records for your sites (${F.length} documents).  New documents are added every month.</p>
+  <div class="chips" style="margin:6px 0 8px">${sites.map(s=>`<span class="chip ${ftr.site===s?"on":""}" data-s="${esc(s)}">${esc(s)}</span>`).join("")}</div>
+  <div class="row" style="margin-bottom:12px"><select id="cat" style="max-width:300px">${cats.map(c=>`<option ${ftr.cat===c?"selected":""}>${esc(c)}</option>`).join("")}</select><input id="q" placeholder="Search" value="${esc(ftr.q)}" style="max-width:280px"></div>
+  <div class="files">${list.map(f=>`<div class="file"><div class="ic">PDF</div><div><b>${esc(f.title)}</b><div class="sm mut">${esc(f.site)} · ${esc(f.category)} · ${fd(f.file_date)}</div><div class="row"><button class="sec" data-o="${f.id}">View</button><button class="ghost" data-d="${f.id}">Download</button></div></div></div>`).join("")||'<p class="mut">No documents match.</p>'}</div></div>`;
+ document.querySelectorAll("[data-s]").forEach(c=>c.onclick=()=>{ftr.site=c.dataset.s;files()});$("#cat").onchange=e=>{ftr.cat=e.target.value;files()};$("#q").oninput=e=>{ftr.q=e.target.value;clearTimeout(window._q);window._q=setTimeout(()=>{files();$("#q").focus();$("#q").setSelectionRange(99,99)},350)};
+ const open=async(id,dl)=>{const w=dl?null:window.open("about:blank");try{const j=await call({op:"file",session:S,id,download:dl});if(dl)location.href=j.url;else w.location=j.url}catch(e){if(w)w.close();alert(e.message)}};
+ document.querySelectorAll("[data-o]").forEach(b=>b.onclick=()=>open(b.dataset.o,false));document.querySelectorAll("[data-d]").forEach(b=>b.onclick=()=>open(b.dataset.d,true))}
+document.querySelectorAll("nav.tabs button").forEach(b=>b.onclick=()=>tab(b.dataset.t));
+qs.get("setup")?setupView(qs.get("setup")):S?load():loginView();
+</script></body></html>

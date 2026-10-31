@@ -1,0 +1,28 @@
+<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
+<title>FSG report approval</title><link rel="icon" href="../../fsg-logo.jpg"><link rel="stylesheet" href="../app.css?v=1">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="../report.js?v=1"></script></head><body>
+<header class="top"><div class="wrap"><img src="../../fsg-logo.jpg" alt="FSG"><div class="brand"><b>Report approval</b><span>Internal: FSG staff only</span></div></div></header>
+<main class="wrap" id="app"><p class="mut">Loading…</p></main>
+<script>
+const $=s=>document.querySelector(s);const t=new URLSearchParams(location.search).get("t");
+async function load(){let j;try{j=await call({op:"review_get",t})}catch(e){$("#app").innerHTML=`<div class="card">${esc(e.message)}</div>`;return}
+ const r=j.report,me=j.me,d=r.data;const ST={in_review:"Awaiting approval",changes_requested:"Changes requested",published:"Published to the client",superseded:"Replaced by a newer version"};
+ const DEC={approved:'<span class="pill G">Approved</span>',changes:'<span class="pill A">Changes requested</span>'};
+ const issues=[...d.services.filter(s=>s.status==="Outstanding").map(s=>`${s.site}: ${s.service}${s.booked?" (booked "+fdm(s.booked)+")":" – not booked"}`),...d.month_visits.filter(v=>!v.done&&!v.booked).map(v=>`${v.job} ${v.site}: ${v.service} planned ${fdm(v.due)} – no completed or booked visit`)];
+ const open=r.status==="in_review"||r.status==="changes_requested";
+ $("#app").innerHTML=`<div class="card"><h2>${esc(j.account.name)} · ${esc(d.period_label)}: ${ST[r.status]||r.status}</h2>
+  <table><tr><th>Approver</th><th>Role</th><th>Decision</th><th>Note</th></tr>${j.approvals.map(a=>`<tr><td>${esc(a.name)}</td><td>${esc(a.role)}</td><td>${DEC[a.decision]||'<span class="pill X">Waiting</span>'}</td><td class="sm">${esc(a.note||"")}</td></tr>`).join("")}</table>
+  <div class="note" style="margin-top:14px"><b>Before you approve, please check (internal, not shown to the client):</b><ul style="margin:6px 0 0;padding-left:20px">${issues.slice(0,30).map(x=>`<li>${esc(x)}</li>`).join("")||"<li>No outstanding items.</li>"}</ul>
+  <div class="sm mut" style="margin-top:6px">Items still open in JobLogic show to the client as "In progress" or "Booked".  If a visit was done but not closed in JobLogic, close it and ask for the report to be rebuilt.  The report shows sell values only.</div></div>
+  ${open?`<div style="margin-top:14px">${me.is_account_manager?`<label class="sm"><b>Your summary for the client</b> (account manager, required, shown at the top of the report)</label><textarea id="com">${esc(d.commentary||"")}</textarea>`:""}
+   <label class="sm">Note (required if you request changes)</label><textarea id="note" style="min-height:70px"></textarea><div class="err" id="err"></div>
+   <div class="row"><button class="pri" id="ok">Approve for publication</button><button class="sec" id="ch">Request changes</button></div><p class="sm mut">You are ${esc(me.name)}, ${esc(me.role)}.${me.decision?"  You have already recorded a decision; you can change it until the report is published.":""}</p></div>`:""}
+  </div><div class="row" style="justify-content:flex-end;margin-bottom:10px"><button class="ghost" id="pdf">Preview PDF</button></div><div id="rep"></div>`;
+ renderReport($("#rep"),d,{banner:'<div class="banner">Preview: this is exactly what the client will see once all approvers have approved.</div>'});$("#pdf").onclick=()=>reportPdf(d);
+ const dec=async x=>{$("#err").textContent="";try{await call({op:"review_decide",t,decision:x,note:$("#note").value,commentary:$("#com")?$("#com").value:undefined});load();window.scrollTo(0,0)}catch(e){$("#err").textContent=e.message}};
+ if(open){$("#ok").onclick=()=>dec("approved");$("#ch").onclick=()=>dec("changes")}}
+load();
+</script></body></html>
