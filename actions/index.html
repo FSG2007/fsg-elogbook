@@ -1,0 +1,47 @@
+<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>FSG actions</title>
+<style>
+:root{--red:#e8432e;--ink:#2f3337;--mut:#6b7178;--line:#e3e5e8;--bg:#f5f6f7;--g:#1f8a4c;--a:#c98a00;--r:#c62f1d;--b:#2d6cdf;--m:#7b4fc9}
+*{box-sizing:border-box}body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+header{background:#fff;border-bottom:4px solid var(--red)}.wrap{max-width:920px;margin:0 auto;padding:14px 16px}
+header .wrap{display:flex;align-items:center;gap:12px}header img{height:40px}h1{font-size:19px;margin:0}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:14px 0}
+.pill{display:inline-block;font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px;color:#fff}.G{background:var(--g)}.A{background:var(--a)}.R{background:var(--r)}.B{background:var(--b)}.M{background:var(--m)}.X{background:#8a9097}
+.mut{color:var(--mut)}.sm{font-size:13px}table{width:100%;border-collapse:collapse;font-size:14px}th{text-align:left;font-size:12px;color:var(--mut);text-transform:uppercase;padding:8px 6px;border-bottom:1px solid var(--line)}td{padding:9px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+button{font:600 15px inherit;font-family:inherit;border:0;border-radius:8px;padding:11px 16px;cursor:pointer}.pri{background:var(--red);color:#fff}.sec{background:#eef0f2;color:var(--ink)}
+textarea,input{width:100%;font:15px inherit;font-family:inherit;padding:10px;border:1px solid #cfd3d8;border-radius:8px}textarea{min-height:90px}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.ev{border-left:3px solid var(--line);padding:4px 10px;margin:6px 0}.err{color:var(--r);min-height:18px}
+.detail{border-left:3px solid var(--red);padding:2px 12px;margin:10px 0}@media(max-width:640px){.hide-s{display:none}}
+</style></head><body>
+<header><div class="wrap"><img src="../fsg-logo.jpg" alt="FSG"><div><h1>FSG actions</h1><div class="sm mut">Facility Services Group Limited</div></div></div></header>
+<main class="wrap" id="app"><p class="mut">Loading…</p></main>
+<script>
+const API="https://chftzzfssiaacvyvvucu.supabase.co/functions/v1/actions";const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fd=d=>d?new Date(d).toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"}):"–";
+const ft=d=>new Date(d).toLocaleString("en-GB",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"});
+const today=new Date().toLocaleDateString("en-CA");
+const call=async b=>{const r=await fetch(API,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(b)});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||"Something went wrong.");return j};
+function stPill(a){if(a.status==="done")return '<span class="pill G">Complete</span>';if(a.status==="cancelled")return '<span class="pill X">Cancelled</span>';
+  if(a.due_date<today)return '<span class="pill R">Overdue</span>';if(a.due_date===today)return '<span class="pill M">Due today</span>';
+  const d=(Date.parse(a.due_date)-Date.parse(today))/864e5;return d<=2?'<span class="pill A">Due soon</span>':a.status==="in_progress"?'<span class="pill B">In progress</span>':'<span class="pill B">Open</span>'}
+const prio=a=>a.priority==="statutory"?' <span class="pill R">Statutory</span>':a.priority==="high"?' <span class="pill A">High priority</span>':"";
+const KIND={created:"Action created",reminder:"Reminder sent",chase:"Overdue chase sent",escalated:"Escalated to Geraint and Neil",in_progress:"Marked in progress",completed:"Marked complete",note:"Update",extension_request:"Asked for more time",changed:"Changed by office"};
+const t=new URLSearchParams(location.search).get("t");
+async function owner(){let j;try{j=await call({op:"owner_get",t})}catch(e){$("#app").innerHTML=`<div class="card">This link isn’t valid.  Please use the link in your latest action email, or reply to ppm@fsgfm.co.uk.</div>`;return}
+  const a=j.action,open=a.status!=="done"&&a.status!=="cancelled";
+  $("#app").innerHTML=`<div class="card"><div class="sm mut">${esc(a.ref)}${a.site_name?"  ·  "+esc(a.site_name):""}</div><h2 style="margin:4px 0 8px;font-size:20px">${esc(a.title)}</h2>
+  <div>${stPill(a)}${prio(a)}  <span class="sm">Due <b>${fd(a.due_date)}</b>  ·  Owner: ${esc(a.owner_name||"")}  ·  Set by ${esc(a.created_by)}</span></div>
+  ${a.detail_html?`<div class="detail">${a.detail_html}</div>`:""}</div>
+  ${open?`<div class="card"><b>Update this action</b><p class="sm mut" style="margin:4px 0 8px">Add a short note so Geraint and Neil can see where it stands.  A note is needed to mark it complete or to ask for more time.</p>
+  <textarea id="note" placeholder="What has been done, or what is happening next…"></textarea><div class="err" id="err"></div>
+  <div class="row"><button class="pri" data-s="done">Mark complete</button><button class="sec" data-s="in_progress">Mark in progress</button><button class="sec" data-s="note">Add update</button><button class="sec" data-s="extension">Ask for more time</button></div></div>`:""}
+  <div class="card"><b>History</b>${j.events.map(e=>`<div class="ev"><div class="sm"><b>${KIND[e.kind]||esc(e.kind)}</b>  <span class="mut">${ft(e.at)}${e.actor&&e.actor!=="system"?"  ·  "+esc(e.actor):""}</span></div>${e.note&&!["created","changed"].includes(e.kind)?`<div class="sm">${esc(e.note)}</div>`:""}</div>`).join("")}</div>`;
+  document.querySelectorAll("button[data-s]").forEach(b=>b.onclick=async()=>{const s=b.dataset.s,note=$("#note").value;$("#err").textContent="";
+    if(s==="done"&&!confirm("Mark this action as complete?"))return;b.disabled=true;try{await call({op:"owner_update",t,status:s,note});owner()}catch(e){$("#err").textContent=e.message;b.disabled=false}})}
+function office(){$("#app").innerHTML=`<div class="card" style="max-width:420px"><b>Office dashboard</b><p class="sm mut">Read-only list of staff actions.  Enter the office PIN.</p><input id="pin" type="password" inputmode="numeric" autocomplete="off" placeholder="Office PIN"><div class="err" id="err"></div><div class="row"><button class="pri" id="go">Open</button></div></div>`;
+  const go=async()=>{try{const j=await call({op:"office_list",pin:$("#pin").value});list(j.actions)}catch(e){$("#err").textContent=e.message}};$("#go").onclick=go;$("#pin").onkeydown=e=>{if(e.key==="Enter")go()}}
+function list(A){const op=A.filter(a=>a.status==="open"||a.status==="in_progress"),cl=A.filter(a=>!op.includes(a));
+  const tb=xs=>`<table><tr><th>Ref</th><th>Action</th><th class="hide-s">Site</th><th>Owner</th><th>Due</th><th>Status</th></tr>${xs.map(a=>`<tr><td>${esc(a.ref)}</td><td>${esc(a.title)}${prio(a)}${a.escalated?' <span class="pill R">Escalated</span>':""}</td><td class="hide-s">${esc(a.site_name||"")}</td><td>${esc(a.owner_name||a.owner_email)}</td><td>${fd(a.due_date)}</td><td>${stPill(a)}</td></tr>`).join("")||'<tr><td colspan="6" class="mut">None</td></tr>'}</table>`;
+  $("#app").innerHTML=`<div class="card"><b>Open actions (${op.length})</b>${tb(op)}</div><div class="card"><b>Closed</b>${tb(cl.slice(-30).reverse())}</div><p class="sm mut">Actions are set by Geraint or Neil through ppm@fsgfm.co.uk.  Owners update their own actions from the link in their email.</p>`}
+t?owner():office();
+</script></body></html>
