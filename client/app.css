@@ -45,3 +45,7 @@ body.br nav.tabs{background:#111417}
 @media(max-width:640px){header.top .wrap{gap:10px;min-height:56px}header.top img{height:32px}.brand b{font-size:15px}.brand span{display:none}.who{font-size:0}.who button{font-size:13px;margin-left:0}.utbl td,.utbl th{padding:8px 6px}.utbl button{display:block;margin:0 0 4px auto}}
 @media(max-width:640px){.mcards tr:first-child{display:none}.mcards tr{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;padding:10px 2px;border-bottom:1px solid var(--line)}.mcards td{border:0;padding:0;text-align:left}.mcards td.r{text-align:right}.mcards td.full{grid-column:1/-1}.mcards td.full.r{text-align:left}.kpis{grid-template-columns:1fr 1fr!important}.kpis .kpi:last-child:nth-child(odd){grid-column:1/-1}}
 .ml{display:none}@media(max-width:640px){.ml{display:inline;color:var(--mut);font-size:12px}}
+.hero .clogos{position:absolute;right:24px;top:20px;z-index:1;display:flex;gap:16px;align-items:center}.hero .clogos img{width:auto;opacity:.97}
+@media(max-width:640px){.hero .clogos{position:static;margin-bottom:10px}.hero .clogos img{max-height:30px}}
+.cob img.cl{height:var(--h,22px)!important}@media(max-width:640px){.cob img.cl{height:calc(var(--h,22px)*.72)!important}}
+.g2{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}.g2 textarea{font:inherit;padding:8px;border:1px solid #ccd;border-radius:6px}
