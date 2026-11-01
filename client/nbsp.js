@@ -1,0 +1,3 @@
+// House style: two spaces after a full stop.  HTML collapses double spaces, so keep the first as a non-breaking space.
+(function(){const fix=root=>{const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let n;while(n=w.nextNode()){if(n.nodeValue.indexOf(".  ")>-1&&!/^(SCRIPT|STYLE|TEXTAREA)$/.test(n.parentNode.nodeName))n.nodeValue=n.nodeValue.replace(/([.?!])  (?=\S)/g,"$1\u00a0 ")}};
+let t;new MutationObserver(()=>{clearTimeout(t);t=setTimeout(()=>fix(document.body),30)}).observe(document.documentElement,{childList:true,subtree:true});document.addEventListener("DOMContentLoaded",()=>fix(document.body))})();
