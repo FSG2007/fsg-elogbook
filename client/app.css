@@ -49,3 +49,4 @@ body.br nav.tabs{background:#111417}
 @media(max-width:640px){.hero .clogos{position:static;margin-bottom:10px}.hero .clogos img{max-height:30px}}
 .cob img.cl{height:var(--h,22px)!important}@media(max-width:640px){.cob img.cl{height:calc(var(--h,22px)*.72)!important}}
 .g2{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}.g2 textarea{font:inherit;padding:8px;border:1px solid #ccd;border-radius:6px}
+@media(min-width:900px){nav.tabs .wrap{flex-wrap:wrap;overflow:visible}nav.tabs button{padding:13px 13px}}

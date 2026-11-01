@@ -30,7 +30,7 @@ function renderReport(el,d,opts={}){
   <div class="kpis">
    <div class="kpi"><div class="ring"><canvas id="r1"></canvas><div><div class="l">Planned visits this month</div><div class="v">${pct(S.ppm_done,S.ppm_due)}%</div><div class="s">${S.ppm_done} of ${S.ppm_due} completed</div></div></div></div>
    <div class="kpi"><div class="ring"><canvas id="r2"></canvas><div><div class="l">Rolling 12 months</div><div class="v">${pct(S.ppm_12m_done,S.ppm_12m_due)}%</div><div class="s">${S.ppm_12m_done} of ${S.ppm_12m_due} visits</div></div></div></div>
-   <div class="kpi"><div class="l">Services maintained</div><div class="v">${S.services}</div><div class="s">across ${sites.length} sites · ${S.assets} assets and systems</div></div>
+   <div class="kpi"><div class="l">Services maintained</div><div class="v">${S.services}</div><div class="s">across ${sites.length} site${sites.length===1?"":"s"} · ${S.assets} assets and systems</div></div>
    <div class="kpi"><div class="l">Reactive requests</div><div class="v">${S.reactive_raised}</div><div class="s">raised this month · ${S.reactive_open} open in total</div></div>
    ${S.quotes_awaiting==null?"":`<div class="kpi"><div class="l">Quotes awaiting approval</div><div class="v">${S.quotes_awaiting}</div><div class="s">${gbp(S.quotes_awaiting_value)} + VAT</div></div>`}
    ${S.invoiced_month==null?"":`<div class="kpi"><div class="l">Invoiced this month</div><div class="v">${gbp(S.invoiced_month)}</div><div class="s">${gbp(S.invoiced_contract_year)} contract year to date (ex VAT)</div></div>`}
