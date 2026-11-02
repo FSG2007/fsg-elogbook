@@ -321,9 +321,8 @@ $("#pinGo").onclick=async()=>{const pin=$("#pin").value.trim();$("#pinE").textCo
 function dueBox(d){if(!d)return "";const n=d.next;return `<div style="background:#fdeeea;border-radius:10px;padding:10px 12px;margin:8px 0">
   <div class="sm mut" style="font-weight:700;letter-spacing:.04em">THIS WEEK&rsquo;S FIRE ALARM TEST</div>
   <div style="font-size:17px;font-weight:700;margin:4px 0">Call point ${esc(n.cp_ref)}: ${esc(n.location)}</div>
-  <div class="sm">Also check: ${d.interfaces.map(i=>esc(i.location.split(" - ")[0])).join(", ")}</div>
   <div class="sm mut" style="margin-top:4px">${d.last?`Last tested: ${esc(d.last.cp_ref)} on ${fd(d.last.test_at)}.  `:""}Next week: ${esc(d.after.cp_ref)} (${esc(d.after.location)}).  ${d.total} call points in rotation.</div>
-  <div class="sm" style="margin-top:6px"><b>Record in your JobLogic notes:</b> call point tested, interfaces checked, ARC confirmed, panel faults and disablements before and after.</div></div>`}
+  <div class="sm" style="margin-top:6px"><b>Record in your JobLogic notes:</b> call point tested, ARC confirmed, panel faults and disablements before and after.  Interfaces (lifts, AOVs, door holders and plant shutdown) are tested at the annual inspection, not weekly.</div></div>`}
 function faultBox(){const FO=(D.faults||[]).filter(f=>f.status!=="closed");if(!FO.length)return `<div class="sm" style="color:var(--g);margin:6px 0">No open faults or disablements recorded.</div>`;
   return `<div style="border-left:4px solid var(--r);padding:6px 10px;margin:8px 0"><div class="sm" style="font-weight:700;color:var(--r)">${FO.length} open fault${FO.length>1?"s":""} or disablement${FO.length>1?"s":""} &ndash; check and record their status</div>${FO.map(f=>`<div class="sm">&bull; ${esc(f.title)}</div>`).join("")}</div>`}
 $("#pin").onkeydown=e=>{if(e.key==="Enter")$("#pinGo").click()};
