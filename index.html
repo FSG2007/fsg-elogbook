@@ -318,11 +318,20 @@ $("#pinGo").onclick=async()=>{const pin=$("#pin").value.trim();$("#pinE").textCo
   const r=await post(who==="office"?{action:"codes",office:true,pin}:{action:"codes",engineer_id:Number(who),pin});
   if(!r.ok){$("#pinE").textContent=r.j.error||"Not available.";return}
   $("#pinOut").innerHTML=`<p class="sm" style="color:var(--g);font-weight:600;margin:8px 0">PIN accepted.  Signed in as ${esc(r.j.name||"")}.</p>`+dueBox(r.j.due)+faultBox()+`<h4 style="margin:14px 0 6px">Codes</h4>`+codesTable(r.j.codes||[])};
-function dueBox(d){if(!d)return "";const n=d.next;return `<div style="background:#fdeeea;border-radius:10px;padding:10px 12px;margin:8px 0">
-  <div class="sm mut" style="font-weight:700;letter-spacing:.04em">THIS WEEK&rsquo;S FIRE ALARM TEST</div>
-  <div style="font-size:17px;font-weight:700;margin:4px 0">Call point ${esc(n.cp_ref)}: ${esc(n.location)}</div>
-  <div class="sm mut" style="margin-top:4px">${d.last?`Last tested: ${esc(d.last.cp_ref)} on ${fd(d.last.test_at)}.  `:""}Next week: ${esc(d.after.cp_ref)} (${esc(d.after.location)}).  ${d.total} call points in rotation.</div>
-  <div class="sm" style="margin-top:6px"><b>Record in your JobLogic notes:</b> call point tested, ARC confirmed, panel faults and disablements before and after.  Interfaces (lifts, AOVs, door holders and plant shutdown) are tested at the annual inspection, not weekly.</div></div>`}
+function dueBox(d){if(!d)return "";
+  const P=(d.panels&&d.panels.length)?d.panels:(d.next?[{panel:"",total:d.total,tested:0,remaining:1,pool:[d.next],suggested:d.next,last:d.last}]:[]);
+  const pan=P.map(p=>{const fresh=p.tested===0;
+    const chips=p.pool.map((c,k)=>`<li style="margin:3px 0"><b>${esc(c.cp_ref)}</b>: ${esc(c.location)}${k===0?` <span class="sm" style="color:var(--g);font-weight:700">(suggested: longest since tested)</span>`:""}</li>`).join("");
+    return `<div style="margin:6px 0 2px">${P.length>1?`<div style="font-weight:700">${esc(p.panel)}</div>`:""}
+    <div class="sm" style="margin:2px 0">${p.remaining===1?"<b>Only one call point left in this cycle.  Test this one:</b>":`<b>Choose any one</b> of these ${p.remaining} call points not yet tested in this cycle:`}</div>
+    <ul style="margin:4px 0 4px 18px;padding:0">${chips}</ul>
+    <div class="sm mut">${fresh?"A new cycle starts with this test.  ":`${p.tested} of ${p.total} tested this cycle${p.cycle_start?` (since ${fd(p.cycle_start)})`:""}.  `}${p.last?`Last tested: ${esc(p.last.cp_ref)} on ${fd(p.last.test_at)}.  `:""}Once all ${p.total} have been tested, the full list comes back.</div></div>`}).join("");
+  const W=(d.checks||[]).filter(c=>c.freq==="weekly"),M=(d.checks||[]).filter(c=>c.freq==="monthly");
+  const ck=(L,h)=>L.length?`<div class="sm" style="margin-top:6px"><b>${h}</b><ul style="margin:3px 0 0 18px;padding:0">${L.map(c=>`<li>${esc(c.item)}</li>`).join("")}</ul></div>`:"";
+  return `<div style="background:#fdeeea;border-radius:10px;padding:10px 12px;margin:8px 0">
+  <div class="sm mut" style="font-weight:700;letter-spacing:.04em">THIS WEEK&rsquo;S FIRE ALARM TEST</div>${pan}
+  ${ck(W,"Also check every week (yes or no for each):")}${ck(M,"Monthly checks (first test of each month):")}
+  <div class="sm" style="margin-top:6px"><b>Record in your JobLogic notes:</b> the call point you tested and its location, the panel and sounders responded, ARC confirmed, each check above as yes or no, and any faults or disablements before and after.  If a call point can&rsquo;t be reached, choose another and say why.  It stays in the pool.</div></div>`}
 function faultBox(){const FO=(D.faults||[]).filter(f=>f.status!=="closed");if(!FO.length)return `<div class="sm" style="color:var(--g);margin:6px 0">No open faults or disablements recorded.</div>`;
   return `<div style="border-left:4px solid var(--r);padding:6px 10px;margin:8px 0"><div class="sm" style="font-weight:700;color:var(--r)">${FO.length} open fault${FO.length>1?"s":""} or disablement${FO.length>1?"s":""} &ndash; check and record their status</div>${FO.map(f=>`<div class="sm">&bull; ${esc(f.title)}</div>`).join("")}</div>`}
 $("#pin").onkeydown=e=>{if(e.key==="Enter")$("#pinGo").click()};
